@@ -1,0 +1,47 @@
+body {
+    font-family: system-ui, sans-serif;
+    margin: 0;
+    padding: 1rem;
+}
+
+main {
+    max-width: 32rem;
+    margin: 0 auto;
+}
+
+h1:focus {
+    outline: none;
+}
+
+button {
+    font-size: 1rem;
+    padding: 0.4rem 0.9rem;
+    margin-right: 0.4rem;
+}
+
+input[type=number] {
+    width: 5rem;
+    margin-right: 0.4rem;
+}
+
+.moves {
+    margin: 1rem 0;
+}
+
+.error {
+    color: #b00020;
+}
+
+.verdict {
+    font-weight: bold;
+}
+
+.blazor-error-boundary {
+    background: #b32121;
+    padding: 1rem;
+    color: white;
+}
+
+    .blazor-error-boundary::after {
+        content: "Er is een fout opgetreden."
+    }

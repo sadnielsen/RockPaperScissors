@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Shared settings (target framework, nullable, warnings as errors) live in Directory.Build.props. -->
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="RockPaperScissors.Tests" />
+  </ItemGroup>
+
+</Project>

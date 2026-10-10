@@ -52,7 +52,7 @@ public interface IStrategy
 
 `history` bevat alleen afgeronde rondes. De strategie heeft geen toegang tot de huidige invoer van de speler.
 
-Leren gebeurt na de ronde: ofwel leidt de strategie alles af uit `history`, ofwel krijgt ze na elke ronde een aparte `Learn`-aanroep. Kies één aanpak en houd die consequent.
+Leren gebeurt na de ronde. **Gekozen aanpak: de strategie leidt alles af uit `history`.** Er is geen aparte `Learn`-aanroep op `IStrategy`. Een lerende strategie verwerkt bij elke `ChooseMove` alleen de rondes die ze nog niet gezien heeft. De historie mag alleen groeien; krimpt ze, dan gooit de strategie een exceptie. Zo blijft `IStrategy` één methode, en kan de sessie het leren niet vergeten of in de verkeerde volgorde aanroepen.
 
 ### RandomStrategy
 
@@ -119,11 +119,15 @@ public interface IPredictor
 
 De exploratiekans is configureerbaar, zodat de computer zelf niet voorspelbaar wordt.
 
-#### EnsembleStrategy
+#### EnsemblePredictor
+
+Het ensemble is zelf een `IPredictor` en geen aparte strategie. De standaard-computer is `PatternStrategy(new EnsemblePredictor(...))`. Zo staat "voorspelling → counter + exploratie" op één plek, en is een ensemble net zo te combineren als elke andere predictor.
 
 - Houdt meerdere predictors bij, elk met een score.
-- Na elke ronde: elke predictor die goed voorspelde krijgt +1. Scores zakken langzaam weg (decay, bijv. × 0,9 per ronde), zodat de computer omschakelt als de speler van tactiek wisselt.
-- Volgt de predictor met de hoogste score. Dat lost ook *data sparsity* op: in het begin wint de eenvoudige context, later eventueel een complexere.
+- Na elke ronde: elke predictor die goed voorspelde krijgt +1. Scores zakken langzaam weg (decay, standaard × 0,9 per ronde, configureerbaar via `EnsembleOptions`), zodat de computer omschakelt als de speler van tactiek wisselt.
+- Volgt de predictor met de hoogste score die een voorspelling heeft. De predictors staan van eenvoudig naar complex; bij gelijke score wint de eerste. Dat lost ook *data sparsity* op: in het begin wint de eenvoudige context, later eventueel een complexere.
+
+`StrategyFactory.CreateDefault` stelt deze computer samen (drie contexten, ensemble, `PatternStrategy`), zodat console en web hem identiek opbouwen.
 
 ## Spelverloop: GameSession
 
@@ -137,17 +141,24 @@ public class GameSession
     public int TotalRounds { get; }
     public IReadOnlyList<Round> History { get; }
     public bool IsFinished => History.Count >= TotalRounds;
-    // plus score: gewonnen / verloren / gelijk
+    public Score Score { get; }                // gewonnen / verloren / gelijk
 
     public Round PlayRound(Move playerMove);   // gooit exceptie als IsFinished
 }
 ```
 
+`MinRounds` (1) en `MaxRounds` (1000) zijn constanten op `GameSession`. Het geldige aantal rondes is een domeinregel, zodat console en web dezelfde grens gebruiken.
+
+**De computer legt zich vooraf vast.** De strategie kiest de zet voor de volgende ronde direct bij het aanmaken van de sessie en na elke afgeronde ronde (niet meer na de laatste). Die zet blijft privé in de sessie. Zo heeft de computer gekozen voordat een interface de speler ook maar iets vraagt, en is principe 2 ("kiest *voordat* de invoer gelezen wordt") letterlijk waar en testbaar met een nep-console.
+
 Binnen `PlayRound`, in deze volgorde:
 
-1. Computer kiest zijn zet: de strategie krijgt alleen `History`, nooit `playerMove`.
+1. De vooraf vastgelegde computerzet ophalen. Die is gekozen met alleen `History`, nooit met `playerMove`.
 2. Uitkomst bepalen via de uitkomstmatrix.
-3. Ronde toevoegen aan de historie en de strategie laten leren.
+3. Ronde toevoegen aan de historie en de score bijwerken. De strategie leert hiervan bij haar volgende `ChooseMove` (zie Computerstrategie).
+4. Als het spel niet klaar is: de computer legt zijn volgende zet vast.
+
+`History` is een alleen-lezen view, zodat ook de strategie afgeronde rondes niet kan wijzigen.
 
 De sessie heeft geen eigen lus en doet geen I/O.
 
@@ -194,7 +205,7 @@ README.md                      keuzes en uitleg
 - Elke context: juiste sleutel, en `null` bij te weinig historie.
 - `TransitionTable`: telt goed, voorspelt de hoogste, start neutraal.
 - `PatternStrategy` tegen een vaste cyclus: wint na enkele rondes structureel.
-- `EnsembleStrategy`: volgt de predictor die het vaakst goed zit.
+- `EnsemblePredictor`: volgt de predictor die het vaakst goed zit.
 - **Eerlijkheid:** de strategie kiest zonder de huidige zet te kennen (bijv. strategie-aanroep vindt plaats vóór het lezen van invoer, aantoonbaar met een nep-console).
 - Invoervalidatie: ongeldige invoer leidt tot opnieuw vragen.
 - `GameSession`: is klaar na precies n rondes, houdt de score bij, weigert een ronde na afloop.

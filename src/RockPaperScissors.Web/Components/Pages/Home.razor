@@ -1,0 +1,104 @@
+@page "/"
+@rendermode InteractiveServer
+@inject GameSessionFactory SessionFactory
+
+<PageTitle>Rots, papier, schaar</PageTitle>
+
+<main>
+    <h1>Rots, papier, schaar</h1>
+
+    <section class="start">
+        <label>
+            Aantal rondes (@GameSession.MinRounds-@GameSession.MaxRounds):
+            <input type="number" min="@GameSession.MinRounds" max="@GameSession.MaxRounds" @bind="_requestedRounds" />
+        </label>
+        <button @onclick="StartGame">@(_session is null ? "Start spel" : "Nieuw spel")</button>
+        @if (_error is not null)
+        {
+            <p class="error">@_error</p>
+        }
+    </section>
+
+    @if (_session is not null)
+    {
+        <section class="play">
+            <p>Ronde @(Math.Min(_session.History.Count + 1, _session.TotalRounds)) van @_session.TotalRounds</p>
+
+            <div class="moves">
+                @foreach (var move in Enum.GetValues<Move>())
+                {
+                    <button disabled="@_session.IsFinished" @onclick="() => Play(move)">@NameOf(move)</button>
+                }
+            </div>
+
+            @if (_session.History.Count > 0)
+            {
+                var last = _session.History[^1];
+                <p class="last-round">
+                    Jij: @NameOf(last.Player), computer: @NameOf(last.Computer). @OutcomeText(last.Outcome)
+                </p>
+            }
+
+            <p class="score">
+                @_session.Score.Wins gewonnen, @_session.Score.Losses verloren, @_session.Score.Draws gelijk
+            </p>
+
+            @if (_session.IsFinished)
+            {
+                <p class="verdict">@VerdictText(_session.Score)</p>
+            }
+        </section>
+    }
+</main>
+
+@code {
+    private const int DefaultRounds = 10;
+
+    private int _requestedRounds = DefaultRounds;
+    private GameSession? _session;
+    private string? _error;
+
+    private void StartGame()
+    {
+        if (_requestedRounds < GameSession.MinRounds || _requestedRounds > GameSession.MaxRounds)
+        {
+            _error = $"Kies een aantal van {GameSession.MinRounds} tot en met {GameSession.MaxRounds}.";
+            return;
+        }
+
+        _error = null;
+        _session = SessionFactory.Create(_requestedRounds);
+    }
+
+    private void Play(Move move)
+    {
+        // The buttons are disabled once the game is over; this guards against a click already in flight.
+        if (_session is { IsFinished: false })
+        {
+            _session.PlayRound(move);
+        }
+    }
+
+    private static string NameOf(Move move) => move switch
+    {
+        Move.Rock => "Rots",
+        Move.Paper => "Papier",
+        Move.Scissors => "Schaar",
+        _ => move.ToString(),
+    };
+
+    private static string OutcomeText(Outcome outcome) => outcome switch
+    {
+        Outcome.Win => "Jij wint deze ronde.",
+        Outcome.Lose => "De computer wint deze ronde.",
+        _ => "Gelijkspel.",
+    };
+
+    private static string VerdictText(Score score) =>
+        score.Wins.CompareTo(score.Losses) switch
+        {
+            > 0 => "Jij hebt gewonnen!",
+            < 0 => "De computer heeft gewonnen.",
+            _ => "Het is gelijkspel.",
+        };
+}
