@@ -15,4 +15,35 @@ public sealed class RoundTests
             }
         }
     }
+
+    [Fact]
+    public void Constructor_WithoutPredictions_HasEmptyPredictions()
+    {
+        Assert.Empty(new Round(Move.Rock, Move.Paper).Predictions);
+    }
+
+    [Fact]
+    public void Equals_SameMovesAndEqualPredictionsInOtherLists_IsEqual()
+    {
+        var a = new Round(Move.Rock, Move.Paper, new List<Move?> { Move.Scissors, null });
+        var b = new Round(Move.Rock, Move.Paper, new[] { (Move?)Move.Scissors, null });
+
+        Assert.Equal(a, b);
+        Assert.Equal(a.GetHashCode(), b.GetHashCode());
+    }
+
+    [Fact]
+    public void Equals_DifferentPredictions_IsNotEqual()
+    {
+        var a = new Round(Move.Rock, Move.Paper, [Move.Scissors]);
+        var b = new Round(Move.Rock, Move.Paper, [Move.Rock]);
+
+        Assert.NotEqual(a, b);
+    }
+
+    [Fact]
+    public void Equals_DifferentMoves_IsNotEqual()
+    {
+        Assert.NotEqual(new Round(Move.Rock, Move.Paper), new Round(Move.Rock, Move.Scissors));
+    }
 }

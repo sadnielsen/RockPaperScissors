@@ -3,7 +3,7 @@ using RockPaperScissors.Core.Predictors;
 namespace RockPaperScissors.Core;
 
 /// <summary>
-/// Follows whichever predictor would have been right most often so far, and plays a counter to its prediction.
+/// Follows whichever predictor has been right most often so far, and plays a counter to its prediction.
 /// Holds no game state: every choice is a function of the history and the random numbers.
 /// </summary>
 public sealed class ComputerPlayer : IComputerPlayer
@@ -29,16 +29,33 @@ public sealed class ComputerPlayer : IComputerPlayer
         _explorationRate = explorationRate;
     }
 
-    public Move ChooseMove(IReadOnlyList<Round> history)
+    public ComputerDecision ChooseMove(IReadOnlyList<Round> history)
     {
         ArgumentNullException.ThrowIfNull(history);
+        EnsureRecordedByThisConfiguration(history);
 
+        // Also predicted in exploring rounds: every round must record every prediction,
+        // or later hit scores would miss rounds.
+        IReadOnlyList<Move?> predictions = _predictors.Select(predictor => predictor.Predict(history)).ToList();
+
+        return new ComputerDecision(ChooseMove(history, predictions), predictions);
+    }
+
+    /// <summary>
+    /// How often the predictor at <paramref name="predictorIndex"/> was right so far:
+    /// a count of the predictions recorded in the history, no replaying needed.
+    /// </summary>
+    internal static int HitScore(IReadOnlyList<Round> history, int predictorIndex) =>
+        history.Count(round => round.Predictions[predictorIndex] == round.Player);
+
+    private Move ChooseMove(IReadOnlyList<Round> history, IReadOnlyList<Move?> predictions)
+    {
         if (_random.NextDouble() < _explorationRate)
         {
             return RandomMove();
         }
 
-        Move? prediction = BestPredictor(history)?.Predict(history);
+        Move? prediction = BestPredictorIndex(history) is int best ? predictions[best] : null;
         if (prediction is null)
         {
             return RandomMove();
@@ -48,32 +65,36 @@ public sealed class ComputerPlayer : IComputerPlayer
         return counters[_random.Next(counters.Count)];
     }
 
-    /// <summary>
-    /// How often the predictor would have been right had it been followed from the start.
-    /// For round i it only sees the rounds before i, so replaying is as fair as playing.
-    /// </summary>
-    internal static int HitScore(IPredictor predictor, IReadOnlyList<Round> history) =>
-        Enumerable.Range(1, Math.Max(0, history.Count - 1))
-            .Count(i => predictor.Predict(new HistoryPrefix(history, i)) == history[i].Player);
-
     // On equal scores the earlier predictor wins, which makes the order of the list meaningful:
     // put simple predictors first, they need the least data.
-    private IPredictor? BestPredictor(IReadOnlyList<Round> history)
+    private int? BestPredictorIndex(IReadOnlyList<Round> history)
     {
-        IPredictor? best = null;
+        int? best = null;
         int bestScore = -1;
 
-        foreach (IPredictor predictor in _predictors)
+        for (int index = 0; index < _predictors.Count; index++)
         {
-            int score = HitScore(predictor, history);
+            int score = HitScore(history, index);
             if (score > bestScore)
             {
-                best = predictor;
+                best = index;
                 bestScore = score;
             }
         }
 
         return best;
+    }
+
+    // Recorded predictions are matched to predictors by position, so a history from a computer
+    // with other predictors would silently give wrong scores. Failing loudly is safer.
+    private void EnsureRecordedByThisConfiguration(IReadOnlyList<Round> history)
+    {
+        if (history.Any(round => round.Predictions.Count != _predictors.Count))
+        {
+            throw new ArgumentException(
+                $"The history was recorded by a computer with a different set of predictors; expected {_predictors.Count} predictions per round.",
+                nameof(history));
+        }
     }
 
     private Move RandomMove() => Moves[_random.Next(Moves.Length)];

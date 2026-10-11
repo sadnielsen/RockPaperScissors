@@ -94,6 +94,36 @@ public sealed class GameSessionTests
     }
 
     [Fact]
+    public void PlayRound_ComputerWithPredictors_RecordsPredictionsInRound()
+    {
+        var computer = new ComputerPlayer(
+            [FakePredictor.Always(Move.Scissors), FakePredictor.Always(null)], new FakeRandom(), explorationRate: 0.0);
+        var session = new GameSession(1, computer);
+
+        Round round = session.PlayRound(Move.Rock);
+
+        Assert.Equal([Move.Scissors, null], round.Predictions);
+    }
+
+    [Fact]
+    public void PlayRound_EachRound_RecordedPredictionWasMadeWithoutCurrentPlayerMove()
+    {
+        // Predicts "the player's move in the latest round it can see", which exposes what it was shown.
+        var predictor = new FakePredictor(history => history.Count == 0 ? null : history[^1].Player);
+        var session = new GameSession(3, new ComputerPlayer([predictor], new FakeRandom(), explorationRate: 0.0));
+        Move[] playerMoves = [Move.Paper, Move.Scissors, Move.Rock];
+
+        foreach (Move move in playerMoves)
+        {
+            session.PlayRound(move);
+        }
+
+        // Round k recorded a prediction based on round k-1 only, never on its own move.
+        Assert.Equal([null, Move.Paper, Move.Scissors], session.History.Select(round => round.Predictions[0]));
+        Assert.Equal([0, 1, 2], predictor.ReceivedHistories.Select(history => history.Count));
+    }
+
+    [Fact]
     public void PlayRound_HistoryGivenToComputer_CannotBeModified()
     {
         var computer = new RecordingComputerPlayer();

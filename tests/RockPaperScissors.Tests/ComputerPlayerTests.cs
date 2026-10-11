@@ -1,4 +1,5 @@
 using RockPaperScissors.Core;
+using RockPaperScissors.Core.Predictors;
 using RockPaperScissors.Tests.Fakes;
 
 namespace RockPaperScissors.Tests;
@@ -7,8 +8,9 @@ public sealed class ComputerPlayerTests
 {
     private const double NoExploration = 0.0;
 
-    private static readonly IReadOnlyList<Round> RockOnlyHistory =
-        HistoryTestData.FromPlayerMoves(Move.Rock, Move.Rock, Move.Rock);
+    // Three Rock rounds, recorded by a computer with one predictor that had no prediction.
+    private static readonly IReadOnlyList<Round> OnePredictorHistory =
+        HistoryTestData.WithPredictions((Move.Rock, [null]), (Move.Rock, [null]), (Move.Rock, [null]));
 
     [Fact]
     public void ChooseMove_NoPredictors_PlaysRandomMoveFromAllMoves()
@@ -16,10 +18,11 @@ public sealed class ComputerPlayerTests
         var random = new FakeRandom(ints: 2);
         var computer = new ComputerPlayer([], random, NoExploration);
 
-        Move move = computer.ChooseMove(RockOnlyHistory);
+        ComputerDecision decision = computer.ChooseMove(HistoryTestData.FromPlayerMoves(Move.Rock));
 
-        Assert.Equal(Enum.GetValues<Move>()[2], move);
+        Assert.Equal(Enum.GetValues<Move>()[2], decision.Move);
         Assert.Equal([Enum.GetValues<Move>().Length], random.RequestedMaxValues);
+        Assert.Empty(decision.Predictions);
     }
 
     [Fact]
@@ -27,7 +30,7 @@ public sealed class ComputerPlayerTests
     {
         var computer = new ComputerPlayer([FakePredictor.Always(Move.Rock)], new FakeRandom(), NoExploration);
 
-        Assert.Equal(Move.Paper, computer.ChooseMove(RockOnlyHistory));
+        Assert.Equal(Move.Paper, computer.ChooseMove(OnePredictorHistory).Move);
     }
 
     [Fact]
@@ -36,20 +39,25 @@ public sealed class ComputerPlayerTests
         var random = new FakeRandom(ints: 1);
         var computer = new ComputerPlayer([FakePredictor.Always(null)], random, NoExploration);
 
-        Assert.Equal(Enum.GetValues<Move>()[1], computer.ChooseMove(RockOnlyHistory));
+        Assert.Equal(Enum.GetValues<Move>()[1], computer.ChooseMove(OnePredictorHistory).Move);
     }
 
     [Fact]
-    public void ChooseMove_RollBelowExplorationRate_PlaysRandomMoveWithoutAskingPredictors()
+    public void ChooseMove_RollBelowExplorationRate_PlaysRandomMove()
     {
-        var predictor = FakePredictor.Always(Move.Rock);
         var random = new FakeRandom(nextDouble: 0.1, ints: 0);
-        var computer = new ComputerPlayer([predictor], random, ComputerPlayer.DefaultExplorationRate);
+        var computer = new ComputerPlayer([FakePredictor.Always(Move.Rock)], random, ComputerPlayer.DefaultExplorationRate);
 
-        Move move = computer.ChooseMove(RockOnlyHistory);
+        Assert.Equal(Enum.GetValues<Move>()[0], computer.ChooseMove(OnePredictorHistory).Move);
+    }
 
-        Assert.Equal(Enum.GetValues<Move>()[0], move);
-        Assert.Empty(predictor.ReceivedHistories);
+    [Fact]
+    public void ChooseMove_RollBelowExplorationRate_StillRecordsPredictions()
+    {
+        var random = new FakeRandom(nextDouble: 0.1);
+        var computer = new ComputerPlayer([FakePredictor.Always(Move.Scissors)], random, ComputerPlayer.DefaultExplorationRate);
+
+        Assert.Equal([Move.Scissors], computer.ChooseMove(OnePredictorHistory).Predictions);
     }
 
     [Fact]
@@ -58,43 +66,69 @@ public sealed class ComputerPlayerTests
         var random = new FakeRandom(nextDouble: ComputerPlayer.DefaultExplorationRate);
         var computer = new ComputerPlayer([FakePredictor.Always(Move.Rock)], random, ComputerPlayer.DefaultExplorationRate);
 
-        Assert.Equal(Move.Paper, computer.ChooseMove(RockOnlyHistory));
+        Assert.Equal(Move.Paper, computer.ChooseMove(OnePredictorHistory).Move);
     }
 
     [Fact]
-    public void ChooseMove_PredictorsWithDifferentHitScores_FollowsBestPredictor()
+    public void ChooseMove_PredictorsWithDifferentRecordedHits_FollowsBestPredictor()
     {
-        // The player only plays Rock: the second predictor is always right, the first never.
-        var neverRight = FakePredictor.Always(Move.Scissors);
-        var alwaysRight = FakePredictor.Always(Move.Rock);
-        var computer = new ComputerPlayer([neverRight, alwaysRight], new FakeRandom(), NoExploration);
+        // The player only played Rock: the second predictor was right twice, the first never.
+        var history = HistoryTestData.WithPredictions(
+            (Move.Rock, [null, null]),
+            (Move.Rock, [Move.Paper, Move.Rock]),
+            (Move.Rock, [Move.Scissors, Move.Rock]));
+        IPredictor[] predictors = [FakePredictor.Always(Move.Paper), FakePredictor.Always(Move.Scissors)];
+        var computer = new ComputerPlayer(predictors, new FakeRandom(), NoExploration);
 
-        Assert.Equal(Move.Paper, computer.ChooseMove(RockOnlyHistory));
+        // Follows the second predictor's current prediction (Scissors), so plays Rock.
+        Assert.Equal(Move.Rock, computer.ChooseMove(history).Move);
     }
 
     [Fact]
-    public void ChooseMove_EqualHitScores_FollowsFirstPredictor()
+    public void ChooseMove_EqualRecordedHits_FollowsFirstPredictor()
     {
-        var first = FakePredictor.Always(Move.Paper);
-        var second = FakePredictor.Always(Move.Scissors);
+        var history = HistoryTestData.WithPredictions(
+            (Move.Rock, [Move.Rock, null]),
+            (Move.Paper, [null, Move.Paper]));
+        IPredictor[] predictors = [FakePredictor.Always(Move.Paper), FakePredictor.Always(Move.Scissors)];
+        var computer = new ComputerPlayer(predictors, new FakeRandom(), NoExploration);
+
+        // Both were right once; the counter of the first predictor's Paper is Scissors.
+        Assert.Equal(Move.Scissors, computer.ChooseMove(history).Move);
+    }
+
+    [Fact]
+    public void ChooseMove_AnyHistory_ReturnsEachPredictorsPredictionInOrder()
+    {
+        IPredictor[] predictors = [FakePredictor.Always(Move.Paper), FakePredictor.Always(null), FakePredictor.Always(Move.Rock)];
+        var computer = new ComputerPlayer(predictors, new FakeRandom(), NoExploration);
+
+        ComputerDecision decision = computer.ChooseMove([]);
+
+        Assert.Equal([Move.Paper, null, Move.Rock], decision.Predictions);
+    }
+
+    [Fact]
+    public void ChooseMove_AnyHistory_AsksEachPredictorOnceWithExactlyThatHistory()
+    {
+        var first = FakePredictor.Always(Move.Rock);
+        var second = FakePredictor.Always(null);
+        var history = HistoryTestData.WithPredictions((Move.Rock, [null, null]), (Move.Paper, [Move.Rock, null]));
         var computer = new ComputerPlayer([first, second], new FakeRandom(), NoExploration);
-
-        // Both scored 0; the counter of Paper is Scissors.
-        Assert.Equal(Move.Scissors, computer.ChooseMove(RockOnlyHistory));
-    }
-
-    [Fact]
-    public void ChooseMove_ReplayingHistory_PredictorOnlySeesRoundsBeforeEachRound()
-    {
-        var history = HistoryTestData.FromPlayerMoves(Move.Rock, Move.Paper, Move.Scissors, Move.Rock);
-        var predictor = FakePredictor.Always(Move.Rock);
-        var computer = new ComputerPlayer([predictor], new FakeRandom(), NoExploration);
 
         computer.ChooseMove(history);
 
-        // Replay for rounds 1..3, then the real prediction on the whole history.
-        Assert.Equal([1, 2, 3, 4], predictor.ReceivedHistories.Select(received => received.Count));
-        Assert.All(predictor.ReceivedHistories, received => Assert.Equal(history.Take(received.Count), received));
+        // No replaying: each predictor sees the whole history once, and nothing more.
+        Assert.All([first, second], predictor => Assert.Equal([history], predictor.ReceivedHistories));
+    }
+
+    [Fact]
+    public void ChooseMove_HistoryWithOtherNumberOfPredictions_Throws()
+    {
+        var computer = new ComputerPlayer(
+            [FakePredictor.Always(Move.Rock), FakePredictor.Always(Move.Rock)], new FakeRandom(), NoExploration);
+
+        Assert.Throws<ArgumentException>(() => computer.ChooseMove(OnePredictorHistory));
     }
 
     [Fact]
@@ -102,7 +136,7 @@ public sealed class ComputerPlayerTests
     {
         var computer = new ComputerPlayer([FakePredictor.Always(Move.Rock)], new Random(42), explorationRate: 1.0);
 
-        var moves = Enumerable.Range(0, 100).Select(_ => computer.ChooseMove(RockOnlyHistory)).ToHashSet();
+        var moves = Enumerable.Range(0, 100).Select(_ => computer.ChooseMove(OnePredictorHistory).Move).ToHashSet();
 
         Assert.Equal(Enum.GetValues<Move>().ToHashSet(), moves);
     }
@@ -112,17 +146,21 @@ public sealed class ComputerPlayerTests
     {
         var computer = new ComputerPlayer([FakePredictor.Always(Move.Rock)], new Random(42), NoExploration);
 
-        var moves = Enumerable.Range(0, 100).Select(_ => computer.ChooseMove(RockOnlyHistory)).ToHashSet();
+        var moves = Enumerable.Range(0, 100).Select(_ => computer.ChooseMove(OnePredictorHistory).Move).ToHashSet();
 
         Assert.Equal([Move.Paper], moves);
     }
 
     [Fact]
-    public void HitScore_PredictorRightTwice_ReturnsTwo()
+    public void HitScore_PredictionsRightTwice_ReturnsTwo()
     {
-        var history = HistoryTestData.FromPlayerMoves(Move.Paper, Move.Rock, Move.Paper, Move.Rock);
+        var history = HistoryTestData.WithPredictions(
+            (Move.Paper, [null]),
+            (Move.Rock, [Move.Rock]),
+            (Move.Paper, [Move.Rock]),
+            (Move.Rock, [Move.Rock]));
 
-        Assert.Equal(2, ComputerPlayer.HitScore(FakePredictor.Always(Move.Rock), history));
+        Assert.Equal(2, ComputerPlayer.HitScore(history, predictorIndex: 0));
     }
 
     [Theory]

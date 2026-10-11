@@ -42,10 +42,11 @@ public sealed class GameSession
             throw new InvalidOperationException($"The game is finished after {TotalRounds} rounds.");
         }
 
-        // The computer chooses first and only sees completed rounds: playerMove cannot reach it.
-        Move computerMove = _computer.ChooseMove(History);
+        // The computer chooses, and its predictors predict, before playerMove is used:
+        // it only sees completed rounds, so the recorded predictions cannot depend on this move.
+        ComputerDecision decision = _computer.ChooseMove(History);
 
-        var round = new Round(playerMove, computerMove);
+        var round = new Round(playerMove, decision.Move, decision.Predictions);
         _history.Add(round);
         return round;
     }

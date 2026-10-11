@@ -24,6 +24,16 @@ public sealed class InMemoryHistoryStoreTests
     }
 
     [Fact]
+    public void Load_AfterSave_KeepsRecordedPredictions()
+    {
+        IReadOnlyList<Round> history = [new Round(Move.Rock, Move.Paper, [Move.Scissors, null])];
+
+        _store.Save("alice", history);
+
+        Assert.Equal([Move.Scissors, null], _store.Load("alice")[0].Predictions);
+    }
+
+    [Fact]
     public void Load_OtherPlayer_DoesNotSeeHistory()
     {
         _store.Save("alice", HistoryTestData.FromPlayerMoves(Move.Rock));
