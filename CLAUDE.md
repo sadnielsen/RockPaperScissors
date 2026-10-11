@@ -25,16 +25,20 @@ dotnet run --project src/RockPaperScissors.Web
 
 - `RockPaperScissors.Core` bevat alle spellogica en verwijst naar geen enkel ander project. Geen `Console`, geen ASP.NET/Blazor, geen bestands- of netwerk-I/O.
 - Console en Web zijn dunne lagen: invoer lezen, `GameSession` aanroepen, resultaat tonen. Geen spelregels in de interfaces.
-- **Eerlijkheid is een invariant:** een strategie krijgt alleen afgeronde rondes. De zet van de speler in de huidige ronde mag nooit een strategie bereiken, ook niet indirect.
+- **De history is de enige toestand.** `GameSession` beheert de lijst rondes; al het andere (uitkomst, score, voorspellingen, trefferscores) wordt daaruit berekend. Predictors en `ComputerPlayer` hebben geen velden die tijdens het spel veranderen.
+- Geen tellers, tabellen, caches of `Learn`-methodes toevoegen om afgeleide gegevens bij te houden. Lijkt dat nodig (bijv. voor snelheid), stop dan en vraag het eerst.
+- **Eerlijkheid is een invariant:** de computer krijgt alleen afgeronde rondes. De zet van de speler in de huidige ronde mag nooit een predictor of `ComputerPlayer` bereiken, ook niet indirect. Bij het naspelen voor trefferscores ziet een predictor alleen de rondes vóór de ronde die hij voorspelt.
 - Spelregels staan alleen in de uitkomstmatrix. Geen `if`/`switch` op zetcombinaties elders.
+- Nergens uitgaan van precies drie zetten: geen hardcoded 3 of vaste lijst zetten, gebruik `Enum.GetValues<Move>()`.
 
 ## Codestijl
 
-- .NET 8, nullable reference types aan, warnings as errors.
+- .NET 10 (LTS), nullable reference types aan, warnings as errors.
 - File-scoped namespaces, één publiek type per bestand, bestandsnaam = typenaam.
-- Klassen `sealed` tenzij overerving bedoeld is. Records voor waardetypen en sleutels.
+- Klassen `sealed` tenzij overerving bedoeld is. Records voor waardetypen.
 - `Random` wordt geïnjecteerd, nooit `new Random()` in een methode of lus, geen statische `Random`.
-- Geen magische getallen: exploratiekans en decay zijn benoemde, configureerbare waarden.
+- Geen magische getallen: exploratiekans en maximum aantal rondes zijn benoemde waarden.
+- Kies bij twijfel de eenvoudigste oplossing die de spec volgt. Geen extra abstracties, generics of lagen die de spec niet noemt.
 - Code, namen en commentaar in het Engels. Commentaar legt *waarom* uit, niet *wat*.
 
 ## Tests
