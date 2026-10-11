@@ -14,9 +14,10 @@ public sealed class LastMoveAndOutcomePredictor : IPredictor
             return null;
         }
 
-        Round last = history[^1];
+        Move lastMove = history[^1].Player;
+        Outcome lastOutcome = history[^1].Outcome;
         return PatternCounter.MostFrequentNext(
             history,
-            i => history[i - 1].Player == last.Player && history[i - 1].Outcome == last.Outcome);
+            i => history[i - 1].Player == lastMove && history[i - 1].Outcome == lastOutcome);
     }
 }
