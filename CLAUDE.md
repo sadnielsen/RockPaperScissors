@@ -25,9 +25,9 @@ dotnet run --project src/RockPaperScissors.Web
 
 - `RockPaperScissors.Core` bevat alle spellogica en verwijst naar geen enkel ander project. Geen `Console`, geen ASP.NET/Blazor, geen bestands- of netwerk-I/O.
 - Console en Web zijn dunne lagen: invoer lezen, `GameSession` aanroepen, resultaat tonen. Geen spelregels in de interfaces.
-- **De history is de enige toestand.** `GameSession` beheert de lijst rondes; al het andere (uitkomst, score, voorspellingen, trefferscores) wordt daaruit berekend. Predictors en `ComputerPlayer` hebben geen velden die tijdens het spel veranderen.
+- **De history is de enige toestand.** `GameSession` beheert de lijst rondes; al het andere (uitkomst, score, trefferscores) wordt daaruit berekend. Wat elke predictor vóór een ronde voorspelde, wordt als feit ín die `Round` vastgelegd (`Predictions`), niet ernaast. Predictors en `ComputerPlayer` hebben geen velden die tijdens het spel veranderen.
 - Geen tellers, tabellen, caches of `Learn`-methodes toevoegen om afgeleide gegevens bij te houden. Lijkt dat nodig (bijv. voor snelheid), stop dan en vraag het eerst.
-- **Eerlijkheid is een invariant:** de computer krijgt alleen afgeronde rondes. De zet van de speler in de huidige ronde mag nooit een predictor of `ComputerPlayer` bereiken, ook niet indirect. Bij het naspelen voor trefferscores ziet een predictor alleen de rondes vóór de ronde die hij voorspelt.
+- **Eerlijkheid is een invariant:** de computer krijgt alleen afgeronde rondes. De zet van de speler in de huidige ronde mag nooit een predictor of `ComputerPlayer` bereiken, ook niet indirect. Een voorspelling wordt gemaakt en vastgelegd voordat de zet van de speler in die ronde bekend is, en wordt daarna nooit meer aangepast.
 - Spelregels staan alleen in de uitkomstmatrix. Geen `if`/`switch` op zetcombinaties elders.
 - Nergens uitgaan van precies drie zetten: geen hardcoded 3 of vaste lijst zetten, gebruik `Enum.GetValues<Move>()`.
 

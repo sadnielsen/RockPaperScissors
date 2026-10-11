@@ -19,7 +19,9 @@ De **history** (de lijst gespeelde rondes) is de enige toestand in het spel. Al 
 | Uitkomst van een ronde | regels toepassen op de twee zetten |
 | Score | uitkomsten tellen |
 | Voorspelling van een predictor | patroon zoeken in de history |
-| Welke predictor het beste is | elke predictor de history laten naspelen en treffers tellen |
+| Welke predictor het beste is | tellen hoe vaak de vastgelegde voorspelling van elke predictor klopte |
+
+Elke ronde legt naast de twee zetten ook vast wat elke predictor vóór die ronde voorspelde. Dat is geen afgeleide toestand naast de history, maar een feit van dat moment ("wat dacht de computer vóór deze zet"), net als de zet van de computer zelf: eenmalig vastgelegd, onveranderlijk, en ín de history.
 
 Er zijn geen tellers, tabellen, scores of `Learn`-aanroepen die bijgewerkt moeten worden. Predictors en de computerspeler zijn **stateless**: elke beslissing is een pure functie van wat er gespeeld is (plus het random-getal voor exploratie).
 
@@ -29,11 +31,11 @@ Er zijn geen tellers, tabellen, scores of `Learn`-aanroepen die bijgewerkt moete
 - Minder code en minder begrippen dan een opzet met lerende tabellen.
 - Opslaan of herladen van een spel is triviaal: wie de history heeft, heeft alles.
 
-**Prijs:** de computer rekent elke ronde opnieuw. Bij het maximale aantal rondes (zie randgevallen) is dat verwaarloosbaar. Deze afweging staat in de README.
+**Prijs:** de computer rekent elke ronde opnieuw: elke predictor voorspelt één keer op de hele history, en de trefferscores zijn een telling. Dat is O(P·r) per ronde, verwaarloosbaar bij het maximale aantal rondes. Eerder werd de trefferscore berekend door de history na te spelen (O(P·r²) per ronde); waarom dat is veranderd staat in de README.
 
 ## Uitgangspunten
 
-1. **History is de enige toestand.** Niets opslaan wat uit de history af te leiden is. Geen caches.
+1. **History is de enige toestand.** Niets naast de history opslaan wat eruit af te leiden is. Geen caches. Wat de computer op een moment besloot of verwachtte, hoort als feit bij de ronde.
 2. **Regels staan op één plek.** De uitkomstmatrix bepaalt wie wint; nergens anders `if`/`switch` op zetcombinaties.
 3. **De computer speelt eerlijk, en dat is afdwingbaar.** De computer krijgt alleen afgeronde rondes en kiest zijn zet voordat de zet van de speler verwerkt wordt.
 4. **Spellogica staat los van de interface.** Twee interfaces (console en web) op dezelfde `Core` bewijzen die scheiding.
@@ -46,11 +48,16 @@ Er zijn geen tellers, tabellen, scores of `Learn`-aanroepen die bijgewerkt moete
 public enum Move { Rock, Paper, Scissors }
 public enum Outcome { Win, Lose, Draw }   // vanuit de speler gezien
 
-public sealed record Round(Move Player, Move Computer)
+// Predictions: wat elke predictor van de computer vóór deze ronde voorspelde, in de volgorde van zijn predictors.
+public sealed record Round(Move Player, Move Computer, IReadOnlyList<Move?> Predictions)
 {
+    public Round(Move player, Move computer) : this(player, computer, []) { }   // computer zonder predictors
+
     public Outcome Outcome => Rules.Resolve(Player, Computer);   // afgeleid, niet opgeslagen
 }
 ```
+
+`Round` heeft waarde-gelijkheid, ook over `Predictions` (een record vergelijkt een lijst anders op referentie).
 
 ### Rules (uitkomstmatrix)
 
@@ -148,9 +155,11 @@ public sealed class LastMovePredictor : IPredictor
 ## ComputerPlayer: de enige die een zet kiest
 
 ```csharp
+public sealed record ComputerDecision(Move Move, IReadOnlyList<Move?> Predictions);
+
 public interface IComputerPlayer
 {
-    Move ChooseMove(IReadOnlyList<Round> history);
+    ComputerDecision ChooseMove(IReadOnlyList<Round> history);
 }
 
 public sealed class ComputerPlayer : IComputerPlayer
@@ -161,22 +170,23 @@ public sealed class ComputerPlayer : IComputerPlayer
 
 `ChooseMove(history)`:
 
-1. **Exploratie:** met kans `explorationRate` (standaard 0,2) een random zet. Zo wordt de computer zelf niet voorspelbaar.
-2. **Beste predictor kiezen:** voor elke predictor de **trefferscore** berekenen (zie hieronder) en de hoogste nemen. Bij gelijke score wint de predictor die eerder in de lijst staat.
-3. **Voorspellen en counteren:** geeft de beste predictor een voorspelling, speel dan een zet uit `Rules.CountersOf(voorspelling)` (bij meer dan één: random daartussen).
-4. **Geen voorspelling:** random zet.
+1. **Voorspellen:** elke predictor voorspelt één keer op de history. Altijd, ook als de computer gaat exploreren: elke ronde moet elke voorspelling vastleggen, anders missen latere trefferscores rondes.
+2. **Exploratie:** met kans `explorationRate` (standaard 0,2) een random zet. Zo wordt de computer zelf niet voorspelbaar.
+3. **Beste predictor kiezen:** voor elke predictor de **trefferscore** berekenen (zie hieronder) en de hoogste nemen. Bij gelijke score wint de predictor die eerder in de lijst staat.
+4. **Counteren:** geeft de beste predictor een voorspelling, speel dan een zet uit `Rules.CountersOf(voorspelling)` (bij meer dan één: random daartussen).
+5. **Geen voorspelling:** random zet.
+6. Geef de zet en alle voorspellingen terug als `ComputerDecision`.
 
-### Trefferscore (afgeleid, niet opgeslagen)
+### Trefferscore (geteld uit de vastgelegde voorspellingen)
 
 ```
-Score(predictor, history) =
-    aantal rondes i (i ≥ 1) waarvoor
-    predictor.Predict(history[0..i]) == history[i].Player
+Score(predictor p, history) =
+    aantal rondes waarvoor round.Predictions[p] == round.Player
 ```
 
-Oftewel: "hoe vaak had deze predictor gelijk gehad als we hem vanaf het begin hadden gevolgd?" Hierbij ziet de predictor bij ronde i alleen de rondes daarvóór, dus ook het naspelen is eerlijk.
+Oftewel: "hoe vaak had deze predictor gelijk sinds het begin?" Elke voorspelling is gemaakt voordat de zet van de speler in die ronde bekend was, dus de score is net zo eerlijk als het spel zelf.
 
-Geef `history[0..i]` door als read-only weergave op de bestaande lijst (bijv. een kleine interne `IReadOnlyList`-wrapper met een lengte), niet als kopie. Kopiëren per ronde maakt vooral de simulatietests onnodig traag.
+Voorspellingen worden op positie aan predictors gekoppeld. Heeft een ronde een ander aantal voorspellingen dan de computer predictors heeft, dan geeft `ChooseMove` een `ArgumentException`: liever luid falen dan stil verkeerde scores.
 
 Gevolg: in het begin scoort een eenvoudige predictor het best (die heeft het snelst genoeg data), later neemt een specifiekere het over als die vaker gelijk heeft. Dat lost het *data sparsity*-probleem zonder extra code op.
 
@@ -208,8 +218,8 @@ public sealed class GameSession
 
 Binnen `PlayRound`, in deze volgorde:
 
-1. `computer.ChooseMove(History)`: de computer krijgt alleen afgeronde rondes, nooit `playerMove`.
-2. `new Round(playerMove, computerMove)` toevoegen aan de history.
+1. `computer.ChooseMove(History)`: de computer krijgt alleen afgeronde rondes, nooit `playerMove`. Zijn zet en de voorspellingen liggen dus vast voordat `playerMove` gebruikt wordt.
+2. `new Round(playerMove, decision.Move, decision.Predictions)` toevoegen aan de history.
 3. De ronde teruggeven (de uitkomst zit erin als afgeleide property).
 
 De sessie heeft geen eigen lus en doet geen I/O.
@@ -220,7 +230,7 @@ De sessie heeft geen eigen lus en doet geen I/O.
 ## Randgevallen
 
 - Ongeldige zetinvoer: opnieuw vragen, niet crashen. Accepteer bijv. `r/p/s` of `rots/papier/schaar`, hoofdletterongevoelig.
-- Ongeldig aantal rondes (leeg, geen getal, 0, negatief, meer dan 1000): opnieuw vragen. Het maximum houdt ook het opnieuw rekenen van de trefferscores beperkt.
+- Ongeldig aantal rondes (leeg, geen getal, 0, negatief, meer dan 1000): opnieuw vragen. Het maximum houdt ook het opnieuw rekenen per ronde beperkt.
 - Gelijkspel telt als ronde en wordt apart getoond in de score.
 - Einde invoer (Ctrl+Z / Ctrl+D, `null` van `ReadLine`): netjes afsluiten.
 - `PlayRound` aanroepen na de laatste ronde: duidelijke exceptie in `Core`; de interfaces voorkomen dit (web: knoppen uitschakelen).
@@ -230,9 +240,10 @@ De sessie heeft geen eigen lus en doet geen I/O.
 
 - Winlogica als lange if-else-keten in plaats van de uitkomstmatrix.
 - Afgeleide gegevens opslaan (uitkomst, score, tellers) naast de history, waardoor ze uit de pas kunnen lopen.
+- Een cache van voorspellingen of scores in `ComputerPlayer`: die maakt hem stateful en gaat mis zodra dezelfde computer een nieuw spel speelt (in de webapp wordt hij per circuit hergebruikt).
 - `new Random()` in een lus of per ronde.
 - De computer laten kiezen nadat de speler zijn invoer gaf (valsspelen, ook al lijkt het onschuldig).
-- Bij het naspelen voor de trefferscore per ongeluk de hele history meegeven in plaats van alleen de rondes vóór ronde i.
+- Een voorspelling vastleggen of bijwerken nadat de zet van de speler bekend is.
 - Console-I/O vermengd met spellogica, waardoor niets te testen is.
 
 ## Projectstructuur
@@ -261,12 +272,13 @@ README.md                      keuzes en uitleg
 - Elke predictor: juiste voorspelling op een handgemaakte history, `null` bij lege history en bij een gelijke stand.
 - `PatternCounter`: telt alleen rondes waarvan de situatie ervoor overeenkomt.
 - `ComputerPlayer`:
-  - volgt de predictor met de hoogste trefferscore (met nep-predictors);
+  - volgt de predictor met de meeste vastgelegde treffers (met nep-predictors);
   - speelt de counter van de voorspelling;
   - speelt random zonder predictors of zonder voorspelling;
-  - exploratie met een geseede `Random`.
+  - exploratie met een geseede `Random`, en ook dan worden voorspellingen vastgelegd;
+  - weigert een history met een ander aantal voorspellingen per ronde.
 - **Simulatie** (geseede `Random`, 1000 rondes): computer tegen een vaste cyclus wint ruim; tegen win-stay/lose-shift wint duidelijk; tegen een random speler blijft winst, verlies en gelijkspel elk rond een derde.
-- **Eerlijkheid:** de computer krijgt de zet van de huidige ronde niet te zien (bijv. een nep-`IComputerPlayer` die de ontvangen history vastlegt).
+- **Eerlijkheid:** de computer krijgt de zet van de huidige ronde niet te zien (bijv. een nep-`IComputerPlayer` die de ontvangen history vastlegt), en de vastgelegde voorspelling in ronde k is gemaakt op precies de k−1 rondes ervoor.
 - `GameSession`: klaar na precies n rondes, score klopt met de history, weigert een ronde na afloop.
 - Invoervalidatie: ongeldige invoer leidt tot opnieuw vragen.
 
@@ -285,6 +297,7 @@ public interface IHistoryStore
 Alleen een `InMemoryHistoryStore` bouwen. Persistente opslag (bijv. JSON-bestand of SQLite) niet bouwen, wel in de README uitleggen:
 - Voordeel: meer history per speler, dus eerder goede voorspellingen.
 - Nadeel: spelers gedragen zich per sessie anders, dus oude history voorspelt minder dan verwacht.
+- Nadeel: opgeslagen rondes bevatten voorspellingen van de predictors van dat moment. Verandert de set predictors, dan past een oude history niet meer (`ChooseMove` weigert hem). Je moet de history dan migreren, of de voorspellingen per predictor-naam vastleggen in plaats van op positie.
 - Kosten: gebruikers identificeren, opslag kiezen, en AVG (gedragsgegevens van personen opslaan).
 
 ## Buiten scope (wel noemen in README)
@@ -293,9 +306,8 @@ De README krijgt een sectie "Wat ik bewust niet heb gedaan, en waarom" met deze 
 
 - **AI-predictor** (Claude/OpenAI met structured output, of JEV): past achter `IPredictor`, alleen history meesturen, `null` bij fouten. Niet standaard, want de beoordelaar moet het spel zonder sleutel of internet kunnen draaien.
   - Vraagt om **async**: `ValueTask<Move?> PredictAsync(history, CancellationToken)`, wat doorwerkt naar `ComputerPlayer`, `GameSession`, de console-lus en de tests. Een mechanische aanpassing, maar door alle lagen.
-  - Vraagt om **vastgelegde voorspellingen** in plaats van naspelen: naspelen kost bij een externe predictor één call per eerdere ronde, elke ronde opnieuw. Oplossing die bij het kernidee past: elke `Round` legt vast wat elke predictor voorspelde; de trefferscore is dan tellen in de history.
-- **Recente rondes zwaarder laten wegen** in de trefferscore (decay), zodat de computer sneller omschakelt als de speler van tactiek wisselt. Kan als kleine aanpassing in de scoreberekening.
-- **Caching van trefferscores** voor heel lange spellen. Niet nodig binnen het maximum van 1000 rondes, en het zou het kernidee (geen opgeslagen afgeleide gegevens) doorbreken.
+  - De **vastgelegde voorspellingen** zijn er al: een externe predictor wordt per ronde één keer aangeroepen, niet één keer per eerdere ronde.
+- **Recente rondes zwaarder laten wegen** in de trefferscore (decay), zodat de computer sneller omschakelt als de speler van tactiek wisselt. Kan als kleine aanpassing in de telling.
 
 ## Termen
 
