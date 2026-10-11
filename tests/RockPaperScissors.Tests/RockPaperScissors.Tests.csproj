@@ -18,6 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\RockPaperScissors.Core\RockPaperScissors.Core.csproj" />
     <ProjectReference Include="..\..\src\RockPaperScissors.Console\RockPaperScissors.Console.csproj" />
+    <ProjectReference Include="..\..\src\RockPaperScissors.Web\RockPaperScissors.Web.csproj" />
   </ItemGroup>
 
 </Project>
