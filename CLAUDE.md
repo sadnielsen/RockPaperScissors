@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Rots-Papier-Schaar in C# voor een UWV-sollicitatieopdracht. De beoordeling draait om **codekwaliteit**: structuur, testbaarheid, uitbreidbaarheid en verdedigbare keuzes. Een werkend spel alleen is niet genoeg.
+Rots-Papier-Schaar in C# voor een UWV-sollicitatieopdracht. Het doel is een kleine, goed gestructureerde en goed testbare oplossing die de auteur volledig kan toelichten. Niet zoveel mogelijk architectuurconcepten.
 
 ## Specificatie
 
@@ -18,19 +18,16 @@ DESIGN.md is leidend voor alle ontwerpkeuzes:
 dotnet build
 dotnet test
 dotnet run --project src/RockPaperScissors.Console
-dotnet run --project src/RockPaperScissors.Web
 ```
 
 ## Architectuurregels
 
-- `RockPaperScissors.Core` bevat alle spellogica en verwijst naar geen enkel ander project. Geen `Console`, geen ASP.NET/Blazor, geen bestands- of netwerk-I/O.
-- Console en Web zijn dunne lagen: invoer lezen, `GameSession` aanroepen, resultaat tonen. Geen spelregels in de interfaces.
-- **De history is de enige toestand.** `GameSession` beheert de lijst rondes; al het andere (uitkomst, score, voorspellingen) wordt daaruit berekend. Predictors en computerspelers hebben geen velden die tijdens het spel veranderen.
-- Geen tellers, tabellen, caches of `Learn`-methodes toevoegen om afgeleide gegevens bij te houden. Lijkt dat nodig (bijv. voor snelheid), stop dan en vraag het eerst.
-- **Eerlijkheid is een invariant:** de computer krijgt alleen afgeronde rondes. De zet van de speler in de huidige ronde mag nooit een predictor of computerspeler bereiken, ook niet indirect.
-- Spelregels staan alleen in de uitkomstmatrix. Geen `if`/`switch` op zetcombinaties elders.
-- Eén computerspeler per sessie. De logica "counter + exploratie" staat alleen in `PredictingComputerPlayer`; nieuwe tactieken zijn nieuwe predictors.
-- Nergens uitgaan van precies drie zetten: geen hardcoded 3 of vaste lijst zetten, gebruik `Enum.GetValues<Move>()`.
+- `RockPaperScissors.Core` bevat alle spellogica en verwijst naar geen ander project. Geen `Console`, geen bestands- of netwerk-I/O.
+- De console is een dunne laag: invoer lezen, `GameSession` aanroepen, resultaat tonen. Geen spelregels in de console.
+- De gespeelde rondes (`History`) zijn de enige toestand. Uitkomst en score worden daaruit berekend; geen aparte tellers.
+- Spelregels staan alleen in `Rules`. Geen `if`/`switch` op zetcombinaties elders.
+- De computerzet hangt alleen af van `Random`, nooit van de zet van de speler.
+- Geen interfaces, lagen, generics of patronen zonder concrete meerwaarde. Kies bij twijfel de eenvoudigste oplossing.
 
 ## Codestijl
 
@@ -38,16 +35,15 @@ dotnet run --project src/RockPaperScissors.Web
 - File-scoped namespaces, één publiek type per bestand, bestandsnaam = typenaam.
 - Klassen `sealed` tenzij overerving bedoeld is. Records voor waardetypen.
 - `Random` wordt geïnjecteerd, nooit `new Random()` in een methode of lus, geen statische `Random`.
-- Geen magische getallen: exploratiekans en maximum aantal rondes zijn benoemde waarden.
-- Kies bij twijfel de eenvoudigste oplossing die de spec volgt. Geen extra abstracties, generics of lagen die de spec niet noemt.
-- Code, namen en commentaar in het Engels. Commentaar legt *waarom* uit, niet *wat*.
+- Geen magische getallen: het maximum aantal rondes is een benoemde waarde.
+- Code, namen en commentaar in het Engels; tekst voor de speler in het Nederlands. Commentaar legt *waarom* uit, niet *wat*.
 
 ## Tests
 
 - xUnit, in `tests/RockPaperScissors.Tests`.
 - Elke klasse met logica krijgt tests. Testnaam: `Method_Situation_ExpectedResult`.
-- Tests zijn deterministisch: geseede `Random` of een nep-implementatie, nooit afhankelijk van toeval of tijd.
-- Spelverloop testen via `GameSession` of met een nep-console, niet via echte console-I/O.
+- Tests zijn deterministisch: `FakeRandom` of een geseede `Random`, nooit afhankelijk van toeval of tijd.
+- Spelverloop testen via `GameSession` of `ConsoleGame` met `StringReader`/`StringWriter`, niet via echte console-I/O.
 
 ## Werkwijze
 
