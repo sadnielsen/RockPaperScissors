@@ -268,7 +268,7 @@ tests/
 README.md                      keuzes en uitleg
 ```
 
-- .NET 8 (LTS), nullable reference types aan, warnings as errors.
+- .NET 10 (LTS), nullable reference types aan, warnings as errors.
 - Bewust geen volledige Clean Architecture met aparte Application/Infrastructure-lagen: voor deze omvang laten Core + twee interfaces hetzelfde principe zien zonder overdaad. Afhankelijkheden lopen alleen naar `Core`.
 - Web: minimaal qua vormgeving, het gaat om de scheiding.
 - Console-I/O achter een kleine abstractie (bijv. `TextReader`/`TextWriter`), zodat het spelverloop testbaar is.

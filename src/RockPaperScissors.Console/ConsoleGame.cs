@@ -11,10 +11,10 @@ public sealed class ConsoleGame
 {
     private readonly TextReader _input;
     private readonly TextWriter _output;
-    private readonly Func<int, GameSession> _createSession;
+    private readonly Func<int, OpponentOption, GameSession> _createSession;
 
-    /// <param name="createSession">Creates the session once the player has chosen the number of rounds.</param>
-    public ConsoleGame(TextReader input, TextWriter output, Func<int, GameSession> createSession)
+    /// <param name="createSession">Creates the session once the player has chosen the number of rounds and the opponent.</param>
+    public ConsoleGame(TextReader input, TextWriter output, Func<int, OpponentOption, GameSession> createSession)
     {
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(output);
@@ -36,7 +36,14 @@ public sealed class ConsoleGame
             return;
         }
 
-        GameSession session = _createSession(totalRounds.Value);
+        OpponentOption? opponent = ReadOpponent();
+        if (opponent is null)
+        {
+            _output.WriteLine("Geen invoer meer. Tot ziens!");
+            return;
+        }
+
+        GameSession session = _createSession(totalRounds.Value, opponent);
 
         while (!session.IsFinished)
         {
@@ -75,6 +82,42 @@ public sealed class ConsoleGame
             }
 
             _output.WriteLine($"Ongeldig aantal. Kies een heel getal van 1 tot en met {GameSession.MaxRounds}.");
+        }
+    }
+
+    /// <returns>The chosen opponent (the default on empty input), or null when the input has ended.</returns>
+    private OpponentOption? ReadOpponent()
+    {
+        IReadOnlyList<OpponentOption> options = Opponents.All;
+
+        _output.WriteLine("Tegenstanders:");
+        for (int index = 0; index < options.Count; index++)
+        {
+            _output.WriteLine($"  {index + 1}. {options[index].Name} ({options[index].Description})");
+        }
+
+        while (true)
+        {
+            _output.Write($"Kies je tegenstander (1-{options.Count}, Enter = {Opponents.Default.Name}): ");
+            string? line = _input.ReadLine();
+            if (line is null)
+            {
+                return null;
+            }
+
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                return Opponents.Default;
+            }
+
+            if (int.TryParse(line.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int number)
+                && number >= 1
+                && number <= options.Count)
+            {
+                return options[number - 1];
+            }
+
+            _output.WriteLine($"Ongeldige keuze. Kies een nummer van 1 tot en met {options.Count}.");
         }
     }
 

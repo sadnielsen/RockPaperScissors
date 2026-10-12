@@ -6,7 +6,7 @@ namespace RockPaperScissors.Core;
 /// </summary>
 public sealed class GameSession
 {
-    /// <summary>Upper limit for a game; also keeps the replaying of hit scores cheap.</summary>
+    /// <summary>Upper limit for a game; also bounds the pass over the history the computer makes each round.</summary>
     public const int MaxRounds = 1000;
 
     private readonly IComputerPlayer _computer;
@@ -42,11 +42,11 @@ public sealed class GameSession
             throw new InvalidOperationException($"The game is finished after {TotalRounds} rounds.");
         }
 
-        // The computer chooses, and its predictors predict, before playerMove is used:
-        // it only sees completed rounds, so the recorded predictions cannot depend on this move.
-        ComputerDecision decision = _computer.ChooseMove(History);
+        // The computer chooses before playerMove is used: it only sees completed rounds,
+        // so its move cannot depend on this one.
+        Move computerMove = _computer.ChooseMove(History);
 
-        var round = new Round(playerMove, decision.Move, decision.Predictions);
+        var round = new Round(playerMove, computerMove);
         _history.Add(round);
         return round;
     }

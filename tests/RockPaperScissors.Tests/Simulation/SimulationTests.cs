@@ -1,11 +1,10 @@
 using RockPaperScissors.Core;
-using RockPaperScissors.Core.Predictors;
 using Xunit.Abstractions;
 
 namespace RockPaperScissors.Tests.Simulation;
 
 /// <summary>
-/// Full games against scripted opponents, with the same composition as the real program.
+/// Full games of the real opponents against scripted players.
 /// Seeded, so the results are identical on every run.
 /// </summary>
 public sealed class SimulationTests(ITestOutputHelper output)
@@ -15,58 +14,59 @@ public sealed class SimulationTests(ITestOutputHelper output)
     private const int RandomPlayerSeed = 2;
 
     // The ceiling against a predictable player is about 87%: exploring rounds (20%) are won only a third
-    // of the time. Measured: 86.7% against the cycle, 86.0% against win-stay, lose-shift.
-    // The margin keeps the tests meaningful without tying them to one exact run.
+    // of the time. Measured: 86.8% for "Vorige zet" against the cycle, 86.6% for "Zet + uitkomst" against
+    // win-stay, lose-shift. The margin keeps the tests meaningful without tying them to one exact run.
     private const double MinimumWinRateAgainstCycle = 0.75;
     private const double MinimumWinRateAgainstWinStayLoseShift = 0.70;
 
     // A random player cannot be predicted, so every outcome should be close to a third.
     // Over 1000 rounds one standard deviation is about 1.5%; these bounds are about 5 of them.
-    // Measured: 35.3% / 31.8% / 32.9%.
+    // Measured: every share of every opponent between 30.5% and 36.3%.
     private const double MinimumShareAgainstRandom = 0.25;
     private const double MaximumShareAgainstRandom = 0.42;
 
+    public static TheoryData<string> OpponentNames => new(Opponents.All.Select(option => option.Name));
+
     [Fact]
-    public void Play_AgainstFixedCycle_ComputerWinsComfortably()
+    public void Play_LastMoveAgainstFixedCycle_ComputerWinsComfortably()
     {
-        GameSession session = Play(new CyclePlayer());
+        GameSession session = Play(Opponent("Vorige zet"), new CyclePlayer());
 
         Assert.True(ComputerWinRate(session) > MinimumWinRateAgainstCycle, Describe(session));
     }
 
     [Fact]
-    public void Play_AgainstWinStayLoseShift_ComputerWinsClearly()
+    public void Play_DefaultAgainstWinStayLoseShift_ComputerWinsClearly()
     {
-        GameSession session = Play(new WinStayLoseShiftPlayer());
+        GameSession session = Play(Opponents.Default, new WinStayLoseShiftPlayer());
 
         Assert.True(ComputerWinRate(session) > MinimumWinRateAgainstWinStayLoseShift, Describe(session));
         Assert.True(session.Losses > session.Wins, Describe(session));
     }
 
-    [Fact]
-    public void Play_AgainstRandomPlayer_OutcomesStayAroundOneThird()
+    [Theory]
+    [MemberData(nameof(OpponentNames))]
+    public void Play_AnyOpponentAgainstRandomPlayer_OutcomesStayAroundOneThird(string name)
     {
-        GameSession session = Play(new RandomPlayer(new Random(RandomPlayerSeed)));
+        GameSession session = Play(Opponent(name), new RandomPlayer(new Random(RandomPlayerSeed)));
 
         Assert.All(
             [session.Wins, session.Losses, session.Draws],
             count => Assert.InRange((double)count / Rounds, MinimumShareAgainstRandom, MaximumShareAgainstRandom));
     }
 
-    private GameSession Play(ISimulatedPlayer player)
+    private static OpponentOption Opponent(string name) => Opponents.All.Single(option => option.Name == name);
+
+    private GameSession Play(OpponentOption opponent, ISimulatedPlayer player)
     {
-        var computer = new ComputerPlayer(
-            [new FrequencyPredictor(), new LastMovePredictor(), new LastMoveAndOutcomePredictor(), new LastTwoMovesPredictor()],
-            new Random(ComputerSeed),
-            ComputerPlayer.DefaultExplorationRate);
-        var session = new GameSession(Rounds, computer);
+        var session = new GameSession(Rounds, opponent.Create(new Random(ComputerSeed)));
 
         while (!session.IsFinished)
         {
             session.PlayRound(player.NextMove(session.History));
         }
 
-        output.WriteLine(Describe(session));
+        output.WriteLine($"{opponent.Name}: {Describe(session)}");
         return session;
     }
 

@@ -1,6 +1,5 @@
 @page "/"
 @rendermode InteractiveServer
-@inject IComputerPlayer Computer
 
 <PageTitle>Rots, papier, schaar</PageTitle>
 
@@ -10,6 +9,15 @@
     <label>
         Aantal rondes (1-@GameSession.MaxRounds):
         <input type="number" min="1" max="@GameSession.MaxRounds" @bind="_requestedRounds" />
+    </label>
+    <label>
+        Tegenstander:
+        <select @bind="_opponentName">
+            @foreach (OpponentOption option in Opponents.All)
+            {
+                <option value="@option.Name">@option.Name (@option.Description)</option>
+            }
+        </select>
     </label>
     <button @onclick="StartGame">Start spel</button>
     @if (_error is not null)
@@ -47,6 +55,7 @@
 
 @code {
     private int? _requestedRounds = 5;
+    private string _opponentName = Opponents.Default.Name;
     private string? _error;
 
     // The session holds the history, the only game state; everything shown is derived from it.
@@ -60,8 +69,18 @@
             return;
         }
 
+        // The select only offers listed names, but the value comes from the browser, so it is checked anyway.
+        OpponentOption? opponent = Opponents.All.FirstOrDefault(option => option.Name == _opponentName);
+        if (opponent is null)
+        {
+            _error = "Kies een tegenstander uit de lijst.";
+            return;
+        }
+
         _error = null;
-        _session = new GameSession(rounds, Computer);
+        // A new computer player with its own Random per game: Random is not thread-safe,
+        // so nothing is shared between users or circuits.
+        _session = new GameSession(rounds, opponent.Create(new Random()));
     }
 
     // The buttons are disabled once the game is finished, so PlayRound never throws here.

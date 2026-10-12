@@ -34,7 +34,7 @@ dotnet run --project src/RockPaperScissors.Web
 
 ## Codestijl
 
-- .NET 8, nullable reference types aan, warnings as errors.
+- .NET 10 (LTS), nullable reference types aan, warnings as errors.
 - File-scoped namespaces, één publiek type per bestand, bestandsnaam = typenaam.
 - Klassen `sealed` tenzij overerving bedoeld is. Records voor waardetypen.
 - `Random` wordt geïnjecteerd, nooit `new Random()` in een methode of lus, geen statische `Random`.
