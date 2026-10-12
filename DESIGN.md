@@ -19,11 +19,8 @@ De **history** (de lijst gespeelde rondes) is de enige toestand in het spel. Al 
 | Uitkomst van een ronde | regels toepassen op de twee zetten |
 | Score | uitkomsten tellen |
 | Voorspelling van een predictor | patroon zoeken in de history |
-| Welke predictor het beste is | tellen hoe vaak de vastgelegde voorspelling van elke predictor klopte |
 
-Elke ronde legt naast de twee zetten ook vast wat elke predictor vóór die ronde voorspelde. Dat is geen afgeleide toestand naast de history, maar een feit van dat moment ("wat dacht de computer vóór deze zet"), net als de zet van de computer zelf: eenmalig vastgelegd, onveranderlijk, en ín de history.
-
-Er zijn geen tellers, tabellen, scores of `Learn`-aanroepen die bijgewerkt moeten worden. Predictors en de computerspeler zijn **stateless**: elke beslissing is een pure functie van wat er gespeeld is (plus het random-getal voor exploratie).
+Er zijn geen tellers, tabellen, scores of `Learn`-aanroepen die bijgewerkt moeten worden. Predictors en computerspelers zijn **stateless**: elke beslissing is een pure functie van wat er gespeeld is (plus het random-getal voor exploratie).
 
 **Waarom:**
 - Eén bron van waarheid: afgeleide gegevens kunnen nooit uit de pas lopen met de history.
@@ -31,16 +28,17 @@ Er zijn geen tellers, tabellen, scores of `Learn`-aanroepen die bijgewerkt moete
 - Minder code en minder begrippen dan een opzet met lerende tabellen.
 - Opslaan of herladen van een spel is triviaal: wie de history heeft, heeft alles.
 
-**Prijs:** de computer rekent elke ronde opnieuw: elke predictor voorspelt één keer op de hele history, en de trefferscores zijn een telling. Dat is O(P·r) per ronde, verwaarloosbaar bij het maximale aantal rondes. Eerder werd de trefferscore berekend door de history na te spelen (O(P·r²) per ronde); waarom dat is veranderd staat in de README.
+**Prijs:** de computer loopt elke ronde één keer door de history. Dat is verwaarloosbaar, ook bij het maximale aantal rondes.
 
 ## Uitgangspunten
 
-1. **History is de enige toestand.** Niets naast de history opslaan wat eruit af te leiden is. Geen caches. Wat de computer op een moment besloot of verwachtte, hoort als feit bij de ronde.
+1. **History is de enige toestand.** Niets opslaan wat uit de history af te leiden is. Geen caches.
 2. **Regels staan op één plek.** De uitkomstmatrix bepaalt wie wint; nergens anders `if`/`switch` op zetcombinaties.
 3. **De computer speelt eerlijk, en dat is afdwingbaar.** De computer krijgt alleen afgeronde rondes en kiest zijn zet voordat de zet van de speler verwerkt wordt.
 4. **Spellogica staat los van de interface.** Twee interfaces (console en web) op dezelfde `Core` bewijzen die scheiding.
-5. **Uitbreiden door toevoegen** (open/closed). Een nieuwe tactiek is een nieuwe predictor-klasse.
-6. **Voorbereid op meer zetten, zonder ze te bouwen.** Het spel heeft drie zetten, maar niets in de code gaat uit van precies drie (zie "Meer zetten").
+5. **Uitbreiden door toevoegen** (open/closed). Een nieuwe tactiek is een nieuwe predictor-klasse; een nieuw soort tegenstander is een nieuwe `IComputerPlayer`.
+6. **Eén tegenstander per sessie, gekozen door de speler.** Elke computerspeler volgt één vaste tactiek. Dat houdt de logica eenvoudig en voelt voor de speler als moeilijkheidsniveaus.
+7. **Voorbereid op meer zetten, zonder ze te bouwen.** Het spel heeft drie zetten, maar niets in de code gaat uit van precies drie (zie "Meer zetten").
 
 ## Domein
 
@@ -48,16 +46,11 @@ Er zijn geen tellers, tabellen, scores of `Learn`-aanroepen die bijgewerkt moete
 public enum Move { Rock, Paper, Scissors }
 public enum Outcome { Win, Lose, Draw }   // vanuit de speler gezien
 
-// Predictions: wat elke predictor van de computer vóór deze ronde voorspelde, in de volgorde van zijn predictors.
-public sealed record Round(Move Player, Move Computer, IReadOnlyList<Move?> Predictions)
+public sealed record Round(Move Player, Move Computer)
 {
-    public Round(Move player, Move computer) : this(player, computer, []) { }   // computer zonder predictors
-
     public Outcome Outcome => Rules.Resolve(Player, Computer);   // afgeleid, niet opgeslagen
 }
 ```
-
-`Round` heeft waarde-gelijkheid, ook over `Predictions` (een record vergelijkt een lijst anders op referentie).
 
 ### Rules (uitkomstmatrix)
 
@@ -152,47 +145,63 @@ public sealed class LastMovePredictor : IPredictor
 
 `FrequencyPredictor` gebruikt de helper niet: hij telt gewoon alle zetten van de speler.
 
-## ComputerPlayer: de enige die een zet kiest
+## Computerspelers
 
 ```csharp
-public sealed record ComputerDecision(Move Move, IReadOnlyList<Move?> Predictions);
-
 public interface IComputerPlayer
 {
-    ComputerDecision ChooseMove(IReadOnlyList<Round> history);
+    Move ChooseMove(IReadOnlyList<Round> history);
 }
+```
 
-public sealed class ComputerPlayer : IComputerPlayer
+Elke sessie heeft precies één computerspeler, met één vaste tactiek. Er zijn twee implementaties:
+
+```
+IComputerPlayer
+ ├─ RandomComputerPlayer(Random random)
+ └─ PredictingComputerPlayer(IPredictor predictor, Random random, double explorationRate)
+```
+
+### RandomComputerPlayer
+
+Kiest uniform random uit alle waarden van `Move`. Dit is het speltheoretische evenwicht: niet te verslaan, maar wint gemiddeld ook niets.
+
+### PredictingComputerPlayer
+
+De gedeelde logica "voorspelling → counter → soms random" staat hier één keer, voor elke predictor. `ChooseMove(history)`:
+
+1. **Exploratie:** met kans `explorationRate` (standaard 0,2) een random zet. Zo wordt de computer zelf niet voorspelbaar.
+2. **Voorspellen:** `predictor.Predict(history)`.
+3. **Counteren:** is er een voorspelling, speel dan een zet uit `Rules.CountersOf(voorspelling)` (bij meer dan één: random daartussen).
+4. **Geen voorspelling:** random zet.
+
+Bewust compositie (een predictor meegeven) in plaats van een subklasse per tactiek: minder klassen, en elke predictor blijft los testbaar.
+
+`Random` wordt geïnjecteerd (seedbaar in tests) en nooit per ronde opnieuw aangemaakt.
+
+### Tegenstanders kiezen
+
+De speler kiest bij de start een tegenstander. De lijst staat op één plek in `Core`, zodat Console en Web dezelfde keuzes tonen:
+
+```csharp
+public sealed record OpponentOption(string Name, string Description, Func<Random, IComputerPlayer> Create);
+
+public static class Opponents
 {
-    public ComputerPlayer(IEnumerable<IPredictor> predictors, Random random, double explorationRate);
+    public static IReadOnlyList<OpponentOption> All { get; }
+    public static OpponentOption Default { get; }   // LastMoveAndOutcome
 }
 ```
 
-`ChooseMove(history)`:
+| Tegenstander | Computerspeler | Indruk voor de speler |
+|---|---|---|
+| Random | `RandomComputerPlayer` | makkelijk, geen patroon |
+| Frequentie | `PredictingComputerPlayer` + `FrequencyPredictor` | straft een voorkeurszet af |
+| Vorige zet | `PredictingComputerPlayer` + `LastMovePredictor` | straft vaste reeksen af |
+| Laatste twee zetten | `PredictingComputerPlayer` + `LastTwoMovesPredictor` | straft langere reeksen af |
+| Zet + uitkomst (standaard) | `PredictingComputerPlayer` + `LastMoveAndOutcomePredictor` | lastig: straft win-stay/lose-shift af, het meest voorkomende menselijke patroon |
 
-1. **Voorspellen:** elke predictor voorspelt één keer op de history. Altijd, ook als de computer gaat exploreren: elke ronde moet elke voorspelling vastleggen, anders missen latere trefferscores rondes.
-2. **Exploratie:** met kans `explorationRate` (standaard 0,2) een random zet. Zo wordt de computer zelf niet voorspelbaar.
-3. **Beste predictor kiezen:** voor elke predictor de **trefferscore** berekenen (zie hieronder) en de hoogste nemen. Bij gelijke score wint de predictor die eerder in de lijst staat.
-4. **Counteren:** geeft de beste predictor een voorspelling, speel dan een zet uit `Rules.CountersOf(voorspelling)` (bij meer dan één: random daartussen).
-5. **Geen voorspelling:** random zet.
-6. Geef de zet en alle voorspellingen terug als `ComputerDecision`.
-
-### Trefferscore (geteld uit de vastgelegde voorspellingen)
-
-```
-Score(predictor p, history) =
-    aantal rondes waarvoor round.Predictions[p] == round.Player
-```
-
-Oftewel: "hoe vaak had deze predictor gelijk sinds het begin?" Elke voorspelling is gemaakt voordat de zet van de speler in die ronde bekend was, dus de score is net zo eerlijk als het spel zelf.
-
-Voorspellingen worden op positie aan predictors gekoppeld. Heeft een ronde een ander aantal voorspellingen dan de computer predictors heeft, dan geeft `ChooseMove` een `ArgumentException`: liever luid falen dan stil verkeerde scores.
-
-Gevolg: in het begin scoort een eenvoudige predictor het best (die heeft het snelst genoeg data), later neemt een specifiekere het over als die vaker gelijk heeft. Dat lost het *data sparsity*-probleem zonder extra code op.
-
-### Random spelen
-
-Een `ComputerPlayer` zonder predictors speelt altijd random. Er is dus geen aparte `RandomStrategy` nodig. `Random` wordt geïnjecteerd (seedbaar in tests) en nooit per ronde opnieuw aangemaakt.
+Een nieuwe tegenstander toevoegen is een nieuwe regel in deze lijst.
 
 ## Spelverloop: GameSession
 
@@ -218,8 +227,8 @@ public sealed class GameSession
 
 Binnen `PlayRound`, in deze volgorde:
 
-1. `computer.ChooseMove(History)`: de computer krijgt alleen afgeronde rondes, nooit `playerMove`. Zijn zet en de voorspellingen liggen dus vast voordat `playerMove` gebruikt wordt.
-2. `new Round(playerMove, decision.Move, decision.Predictions)` toevoegen aan de history.
+1. `computer.ChooseMove(History)`: de computer krijgt alleen afgeronde rondes, nooit `playerMove`.
+2. `new Round(playerMove, computerMove)` toevoegen aan de history.
 3. De ronde teruggeven (de uitkomst zit erin als afgeleide property).
 
 De sessie heeft geen eigen lus en doet geen I/O.
@@ -230,7 +239,8 @@ De sessie heeft geen eigen lus en doet geen I/O.
 ## Randgevallen
 
 - Ongeldige zetinvoer: opnieuw vragen, niet crashen. Accepteer bijv. `r/p/s` of `rots/papier/schaar`, hoofdletterongevoelig.
-- Ongeldig aantal rondes (leeg, geen getal, 0, negatief, meer dan 1000): opnieuw vragen. Het maximum houdt ook het opnieuw rekenen per ronde beperkt.
+- Ongeldig aantal rondes (leeg, geen getal, 0, negatief, meer dan 1000): opnieuw vragen.
+- Ongeldige keuze van tegenstander: opnieuw vragen. Lege invoer kiest de standaardtegenstander.
 - Gelijkspel telt als ronde en wordt apart getoond in de score.
 - Einde invoer (Ctrl+Z / Ctrl+D, `null` van `ReadLine`): netjes afsluiten.
 - `PlayRound` aanroepen na de laatste ronde: duidelijke exceptie in `Core`; de interfaces voorkomen dit (web: knoppen uitschakelen).
@@ -240,10 +250,9 @@ De sessie heeft geen eigen lus en doet geen I/O.
 
 - Winlogica als lange if-else-keten in plaats van de uitkomstmatrix.
 - Afgeleide gegevens opslaan (uitkomst, score, tellers) naast de history, waardoor ze uit de pas kunnen lopen.
-- Een cache van voorspellingen of scores in `ComputerPlayer`: die maakt hem stateful en gaat mis zodra dezelfde computer een nieuw spel speelt (in de webapp wordt hij per circuit hergebruikt).
 - `new Random()` in een lus of per ronde.
 - De computer laten kiezen nadat de speler zijn invoer gaf (valsspelen, ook al lijkt het onschuldig).
-- Een voorspelling vastleggen of bijwerken nadat de zet van de speler bekend is.
+- De logica "counter spelen + soms random" in elke computerspeler herhalen in plaats van één `PredictingComputerPlayer`.
 - Console-I/O vermengd met spellogica, waardoor niets te testen is.
 
 ## Projectstructuur
@@ -251,7 +260,7 @@ De sessie heeft geen eigen lus en doet geen I/O.
 ```
 RockPaperScissors.sln
 src/
-  RockPaperScissors.Core/      domein, Rules, predictors, ComputerPlayer, GameSession (geen I/O)
+  RockPaperScissors.Core/      domein, Rules, predictors, computerspelers, Opponents, GameSession (geen I/O)
   RockPaperScissors.Console/   console-interface, composition root
   RockPaperScissors.Web/       minimale webinterface (Blazor Server)
 tests/
@@ -259,11 +268,11 @@ tests/
 README.md                      keuzes en uitleg
 ```
 
-- .NET 10 (LTS), nullable reference types aan, warnings as errors.
+- .NET 8 (LTS), nullable reference types aan, warnings as errors.
 - Bewust geen volledige Clean Architecture met aparte Application/Infrastructure-lagen: voor deze omvang laten Core + twee interfaces hetzelfde principe zien zonder overdaad. Afhankelijkheden lopen alleen naar `Core`.
 - Web: minimaal qua vormgeving, het gaat om de scheiding.
 - Console-I/O achter een kleine abstractie (bijv. `TextReader`/`TextWriter`), zodat het spelverloop testbaar is.
-- Composition root (Console en Web): `new ComputerPlayer([new FrequencyPredictor(), new LastMovePredictor(), new LastMoveAndOutcomePredictor(), new LastTwoMovesPredictor()], new Random(), 0.2)`.
+- Console en Web tonen `Opponents.All`, laten de speler kiezen en maken de computerspeler met `option.Create(new Random())`.
 
 ## Tests (minimaal)
 
@@ -271,14 +280,17 @@ README.md                      keuzes en uitleg
 - `Rules` is gebalanceerd: elke zet wint van precies evenveel zetten als hij van verliest. Deze test blijft geldig bij uitbreiding en bewaakt een foute matrix.
 - Elke predictor: juiste voorspelling op een handgemaakte history, `null` bij lege history en bij een gelijke stand.
 - `PatternCounter`: telt alleen rondes waarvan de situatie ervoor overeenkomt.
-- `ComputerPlayer`:
-  - volgt de predictor met de meeste vastgelegde treffers (met nep-predictors);
+- `RandomComputerPlayer`: kiest over alle zetten (met geseede `Random`).
+- `PredictingComputerPlayer` (met een nep-predictor):
   - speelt de counter van de voorspelling;
-  - speelt random zonder predictors of zonder voorspelling;
-  - exploratie met een geseede `Random`, en ook dan worden voorspellingen vastgelegd;
-  - weigert een history met een ander aantal voorspellingen per ronde.
-- **Simulatie** (geseede `Random`, 1000 rondes): computer tegen een vaste cyclus wint ruim; tegen win-stay/lose-shift wint duidelijk; tegen een random speler blijft winst, verlies en gelijkspel elk rond een derde.
-- **Eerlijkheid:** de computer krijgt de zet van de huidige ronde niet te zien (bijv. een nep-`IComputerPlayer` die de ontvangen history vastlegt), en de vastgelegde voorspelling in ronde k is gemaakt op precies de k−1 rondes ervoor.
+  - speelt random zonder voorspelling;
+  - exploratie met een geseede `Random`.
+- `Opponents`: elke optie maakt een werkende computerspeler; de standaard staat in de lijst.
+- **Simulatie** (geseede `Random`, 1000 rondes):
+  - "Vorige zet" tegen een vaste cyclus wint ruim;
+  - "Zet + uitkomst" tegen win-stay/lose-shift wint duidelijk;
+  - elke tegenstander tegen een random speler: winst, verlies en gelijkspel elk rond een derde.
+- **Eerlijkheid:** de computer krijgt de zet van de huidige ronde niet te zien (bijv. een nep-`IComputerPlayer` die de ontvangen history vastlegt).
 - `GameSession`: klaar na precies n rondes, score klopt met de history, weigert een ronde na afloop.
 - Invoervalidatie: ongeldige invoer leidt tot opnieuw vragen.
 
@@ -297,22 +309,22 @@ public interface IHistoryStore
 Alleen een `InMemoryHistoryStore` bouwen. Persistente opslag (bijv. JSON-bestand of SQLite) niet bouwen, wel in de README uitleggen:
 - Voordeel: meer history per speler, dus eerder goede voorspellingen.
 - Nadeel: spelers gedragen zich per sessie anders, dus oude history voorspelt minder dan verwacht.
-- Nadeel: opgeslagen rondes bevatten voorspellingen van de predictors van dat moment. Verandert de set predictors, dan past een oude history niet meer (`ChooseMove` weigert hem). Je moet de history dan migreren, of de voorspellingen per predictor-naam vastleggen in plaats van op positie.
 - Kosten: gebruikers identificeren, opslag kiezen, en AVG (gedragsgegevens van personen opslaan).
 
 ## Buiten scope (wel noemen in README)
 
 De README krijgt een sectie "Wat ik bewust niet heb gedaan, en waarom" met deze punten en de persistente opslag:
 
-- **AI-predictor** (Claude/OpenAI met structured output, of JEV): past achter `IPredictor`, alleen history meesturen, `null` bij fouten. Niet standaard, want de beoordelaar moet het spel zonder sleutel of internet kunnen draaien.
-  - Vraagt om **async**: `ValueTask<Move?> PredictAsync(history, CancellationToken)`, wat doorwerkt naar `ComputerPlayer`, `GameSession`, de console-lus en de tests. Een mechanische aanpassing, maar door alle lagen.
-  - De **vastgelegde voorspellingen** zijn er al: een externe predictor wordt per ronde één keer aangeroepen, niet één keer per eerdere ronde.
-- **Recente rondes zwaarder laten wegen** in de trefferscore (decay), zodat de computer sneller omschakelt als de speler van tactiek wisselt. Kan als kleine aanpassing in de telling.
+- **AI-predictor** (Claude/OpenAI met structured output, of JEV): past achter `IPredictor` en wordt een tegenstander via `PredictingComputerPlayer`. Eén call per ronde, alleen history meesturen, `null` bij fouten. Niet standaard, want de beoordelaar moet het spel zonder sleutel of internet kunnen draaien. Vraagt wel om **async** (`ValueTask<Move?> PredictAsync(history, CancellationToken)`), wat doorwerkt naar `IComputerPlayer`, `GameSession`, de console-lus en de tests: een mechanische aanpassing, maar door alle lagen.
+- **Adaptieve tegenstander** (`AdaptiveComputerPlayer`) die zelf de beste predictor kiest op basis van eerdere treffers. Past als extra `IComputerPlayer` zonder iets anders te wijzigen. Bewust niet gebouwd:
+  - De treffers bepalen door naspelen kost O(n²) per ronde en O(n³) per spel. Oplossingen: één doorloop met tijdelijke tellingen (sweep), of per ronde de voorspellingen van alle predictors vastleggen in de history (nodig bij externe predictors).
+  - Het maakt de code duidelijk complexer, terwijl vaste tegenstanders de opdracht al goed laten zien.
 
 ## Termen
 
 - Single source of truth, pure functies, stateless.
 - Vergelijkbaar met het idee achter *event sourcing*: de lijst gebeurtenissen is de waarheid, toestand wordt eruit afgeleid.
 - Markov-model / n-gram-model (wat de predictors in feite doen), opponent modelling.
-- Ensemble / *prediction with expert advice* (het kiezen van de beste predictor op basis van eerdere treffers).
+- Strategy-patroon (`IComputerPlayer`), compositie boven overerving (`PredictingComputerPlayer` + `IPredictor`).
+- Ensemble / *prediction with expert advice*: wat de adaptieve tegenstander zou doen.
 - Inspiratie: RPS-programmeerwedstrijden ("Iocaine Powder", Dan Egnor, 1999).

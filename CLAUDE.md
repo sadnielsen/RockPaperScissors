@@ -25,15 +25,16 @@ dotnet run --project src/RockPaperScissors.Web
 
 - `RockPaperScissors.Core` bevat alle spellogica en verwijst naar geen enkel ander project. Geen `Console`, geen ASP.NET/Blazor, geen bestands- of netwerk-I/O.
 - Console en Web zijn dunne lagen: invoer lezen, `GameSession` aanroepen, resultaat tonen. Geen spelregels in de interfaces.
-- **De history is de enige toestand.** `GameSession` beheert de lijst rondes; al het andere (uitkomst, score, trefferscores) wordt daaruit berekend. Wat elke predictor vóór een ronde voorspelde, wordt als feit ín die `Round` vastgelegd (`Predictions`), niet ernaast. Predictors en `ComputerPlayer` hebben geen velden die tijdens het spel veranderen.
+- **De history is de enige toestand.** `GameSession` beheert de lijst rondes; al het andere (uitkomst, score, voorspellingen) wordt daaruit berekend. Predictors en computerspelers hebben geen velden die tijdens het spel veranderen.
 - Geen tellers, tabellen, caches of `Learn`-methodes toevoegen om afgeleide gegevens bij te houden. Lijkt dat nodig (bijv. voor snelheid), stop dan en vraag het eerst.
-- **Eerlijkheid is een invariant:** de computer krijgt alleen afgeronde rondes. De zet van de speler in de huidige ronde mag nooit een predictor of `ComputerPlayer` bereiken, ook niet indirect. Een voorspelling wordt gemaakt en vastgelegd voordat de zet van de speler in die ronde bekend is, en wordt daarna nooit meer aangepast.
+- **Eerlijkheid is een invariant:** de computer krijgt alleen afgeronde rondes. De zet van de speler in de huidige ronde mag nooit een predictor of computerspeler bereiken, ook niet indirect.
 - Spelregels staan alleen in de uitkomstmatrix. Geen `if`/`switch` op zetcombinaties elders.
+- Eén computerspeler per sessie. De logica "counter + exploratie" staat alleen in `PredictingComputerPlayer`; nieuwe tactieken zijn nieuwe predictors.
 - Nergens uitgaan van precies drie zetten: geen hardcoded 3 of vaste lijst zetten, gebruik `Enum.GetValues<Move>()`.
 
 ## Codestijl
 
-- .NET 10 (LTS), nullable reference types aan, warnings as errors.
+- .NET 8, nullable reference types aan, warnings as errors.
 - File-scoped namespaces, één publiek type per bestand, bestandsnaam = typenaam.
 - Klassen `sealed` tenzij overerving bedoeld is. Records voor waardetypen.
 - `Random` wordt geïnjecteerd, nooit `new Random()` in een methode of lus, geen statische `Random`.
