@@ -17,7 +17,7 @@ DESIGN.md is leidend voor alle ontwerpkeuzes:
 ```
 dotnet build
 dotnet test
-dotnet run --project src/RockPaperScissors.Console
+dotnet run --project src/RockPaperScissors.ConsoleUI
 ```
 
 ## Architectuurregels

@@ -42,9 +42,11 @@ public static class Rules
 ```csharp
 public sealed class GameSession
 {
+    public const int MinRounds = 1;
     public const int MaxRounds = 1000;
 
-    public GameSession(int totalRounds, Random random);   // exceptie buiten 1..MaxRounds
+    public GameSession(int totalRounds, Random random);   // exceptie buiten MinRounds..MaxRounds
+    public static bool IsValidTotalRounds(int totalRounds);   // ook gebruikt door de console
 
     public int TotalRounds { get; }
     public IReadOnlyList<Round> History { get; }
@@ -53,6 +55,7 @@ public sealed class GameSession
     public int Wins { get; }     // geteld uit History
     public int Losses { get; }
     public int Draws { get; }
+    public Outcome Result { get; }   // winnaar van het spel vanuit de speler, uit Wins en Losses
 
     public Round PlayRound(Move playerMove);   // exceptie als IsFinished
 }
@@ -80,7 +83,7 @@ public sealed class GameSession
 RockPaperScissors.sln
 src/
   RockPaperScissors.Core/      Move, Outcome, Round, Rules, GameSession
-  RockPaperScissors.Console/   ConsoleGame, MoveText, Program
+  RockPaperScissors.ConsoleUI/   ConsoleGame, MoveText, Program
 tests/
   RockPaperScissors.Tests/     xUnit
 ```
@@ -89,7 +92,7 @@ tests/
 
 - `Rules`: alle 9 combinaties.
 - `Round`: uitkomst volgt `Rules`.
-- `GameSession`: klaar na precies n rondes, score klopt, weigert een ronde na afloop, weigert een ongeldig aantal rondes.
+- `GameSession`: klaar na precies n rondes, score en `Result` kloppen, weigert een ronde na afloop, weigert een ongeldig aantal rondes.
 - `ConsoleGame`: spelverloop, ongeldige invoer, einde invoer, eindstand.
 - `MoveText`: geldige en ongeldige invoer.
 

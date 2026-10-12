@@ -1,7 +1,8 @@
+using System.Diagnostics;
 using System.Globalization;
 using RockPaperScissors.Core;
 
-namespace RockPaperScissors.Console;
+namespace RockPaperScissors.ConsoleUI;
 
 /// <summary>
 /// The console loop: reads input, drives a <see cref="GameSession"/>, shows the results.
@@ -60,7 +61,7 @@ public sealed class ConsoleGame
     {
         while (true)
         {
-            _output.Write($"Hoeveel rondes wil je spelen (1-{GameSession.MaxRounds})? ");
+            _output.Write($"Hoeveel rondes wil je spelen ({GameSession.MinRounds}-{GameSession.MaxRounds})? ");
             string? line = _input.ReadLine();
             if (line is null)
             {
@@ -68,13 +69,13 @@ public sealed class ConsoleGame
             }
 
             if (int.TryParse(line.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int rounds)
-                && rounds >= 1
-                && rounds <= GameSession.MaxRounds)
+                && GameSession.IsValidTotalRounds(rounds))
             {
                 return rounds;
             }
 
-            _output.WriteLine($"Ongeldig aantal. Kies een heel getal van 1 tot en met {GameSession.MaxRounds}.");
+            _output.WriteLine(
+                $"Ongeldig aantal. Kies een heel getal van {GameSession.MinRounds} tot en met {GameSession.MaxRounds}.");
         }
     }
 
@@ -106,7 +107,8 @@ public sealed class ConsoleGame
         {
             Outcome.Win => "Je wint deze ronde!",
             Outcome.Lose => "De computer wint deze ronde.",
-            _ => "Gelijkspel.",
+            Outcome.Draw => "Gelijkspel.",
+            _ => throw new UnreachableException(),
         };
 
         _output.WriteLine($"Jij: {MoveText.NameOf(round.Player)}, computer: {MoveText.NameOf(round.Computer)}. {result}");
@@ -114,21 +116,20 @@ public sealed class ConsoleGame
 
     private void WriteScore(GameSession session) =>
         _output.WriteLine(
-            $"Stand na {session.History.Count} rondes: gewonnen {session.Wins}, verloren {session.Losses}, gelijk {session.Draws}.");
+            $"Stand na {RoundsText(session.History.Count)}: gewonnen {session.Wins}, verloren {session.Losses}, gelijk {session.Draws}.");
+
+    private static string RoundsText(int count) => count == 1 ? "1 ronde" : $"{count} rondes";
 
     private void WriteWinner(GameSession session)
     {
-        if (session.Wins > session.Losses)
+        string result = session.Result switch
         {
-            _output.WriteLine("Jij wint het spel!");
-        }
-        else if (session.Losses > session.Wins)
-        {
-            _output.WriteLine("De computer wint het spel.");
-        }
-        else
-        {
-            _output.WriteLine("Het spel eindigt gelijk.");
-        }
+            Outcome.Win => "Jij wint het spel!",
+            Outcome.Lose => "De computer wint het spel.",
+            Outcome.Draw => "Het spel eindigt gelijk.",
+            _ => throw new UnreachableException(),
+        };
+
+        _output.WriteLine(result);
     }
 }

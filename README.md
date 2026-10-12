@@ -7,7 +7,7 @@ Een C#-consoleprogramma waarin een speler rots-papier-schaar speelt tegen de com
 Vereist: .NET 10 SDK (vastgelegd in `global.json`).
 
 ```
-dotnet run --project src/RockPaperScissors.Console
+dotnet run --project src/RockPaperScissors.ConsoleUI
 dotnet test
 ```
 
@@ -18,7 +18,7 @@ Zetten voer je in als `r`/`p`/`s` of `rots`/`papier`/`schaar`; hoofdletters en s
 ```
 src/
   RockPaperScissors.Core/      spellogica, geen I/O
-  RockPaperScissors.Console/   invoer en uitvoer
+  RockPaperScissors.ConsoleUI/   invoer en uitvoer
 tests/
   RockPaperScissors.Tests/     xUnit
 ```
@@ -29,7 +29,7 @@ tests/
 - `Move` en `Outcome`: enums voor de zetten en de uitkomst (gezien vanuit de speler).
 - `Rules.Resolve(player, computer)`: de enige plek die weet wie wint, op basis van een tabel "wint van".
 - `Round`: record met de twee zetten. `Outcome` wordt via `Rules` berekend en niet opgeslagen.
-- `GameSession`: één spel van n rondes. `PlayRound(move)` laat de computer een willekeurige zet kiezen, voegt de ronde toe en geeft hem terug. `Wins`, `Losses` en `Draws` worden geteld uit de gespeelde rondes; `IsFinished` wordt waar na n rondes.
+- `GameSession`: één spel van n rondes. `PlayRound(move)` laat de computer een willekeurige zet kiezen, voegt de ronde toe en geeft hem terug. `Wins`, `Losses` en `Draws` worden geteld uit de gespeelde rondes, `Result` bepaalt daaruit de winnaar van het spel; `IsFinished` wordt waar na n rondes.
 
 **Console**
 - `ConsoleGame`: vraagt het aantal rondes, speelt rondes tot `IsFinished` en toont per ronde de uitkomst en aan het eind de score. Werkt op een `TextReader`/`TextWriter` in plaats van op `Console` zelf.

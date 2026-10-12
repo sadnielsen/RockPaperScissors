@@ -1,7 +1,7 @@
-using RockPaperScissors.Console;
+using RockPaperScissors.ConsoleUI;
 using RockPaperScissors.Core;
 
-namespace RockPaperScissors.Tests.ConsoleUi;
+namespace RockPaperScissors.Tests.ConsoleUI;
 
 public sealed class MoveTextTests
 {

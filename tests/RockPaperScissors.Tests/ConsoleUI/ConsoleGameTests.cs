@@ -1,8 +1,8 @@
-using RockPaperScissors.Console;
+using RockPaperScissors.ConsoleUI;
 using RockPaperScissors.Core;
 using RockPaperScissors.Tests.Fakes;
 
-namespace RockPaperScissors.Tests.ConsoleUi;
+namespace RockPaperScissors.Tests.ConsoleUI;
 
 public sealed class ConsoleGameTests
 {
@@ -27,7 +27,7 @@ public sealed class ConsoleGameTests
         string output = Run("1\nr\n", new FakeRandom(Move.Rock));
 
         Assert.Contains("Jij: rots, computer: rots. Gelijkspel.", output);
-        Assert.Contains("Stand na 1 rondes: gewonnen 0, verloren 0, gelijk 1.", output);
+        Assert.Contains("Stand na 1 ronde: gewonnen 0, verloren 0, gelijk 1.", output);
     }
 
     [Theory]
@@ -39,10 +39,10 @@ public sealed class ConsoleGameTests
     [InlineData("2.5")]
     public void Run_InvalidNumberOfRounds_AsksAgain(string invalid)
     {
-        string output = Run($"{invalid}\n1\nr\n");
+        string output = Run($"{invalid}\n1\nr\n", new FakeRandom(Move.Rock));
 
         Assert.Equal(1, Occurrences(output, InvalidRounds));
-        Assert.Contains("Stand na 1 rondes", output);
+        Assert.Contains("Stand na 1 ronde:", output);
     }
 
     [Fact]
@@ -57,11 +57,11 @@ public sealed class ConsoleGameTests
     [Fact]
     public void Run_InvalidMoves_AsksAgainWithoutPlayingRound()
     {
-        string output = Run("1\nx\n\nrock\ns\n");
+        string output = Run("1\nx\n\nrock\ns\n", new FakeRandom(Move.Rock));
 
         Assert.Equal(3, Occurrences(output, InvalidMove));
         Assert.Equal(1, Occurrences(output, "Jij: "));
-        Assert.Contains("Stand na 1 rondes", output);
+        Assert.Contains("Stand na 1 ronde:", output);
     }
 
     [Fact]
@@ -79,7 +79,7 @@ public sealed class ConsoleGameTests
         string output = Run("3\np\n", new FakeRandom(Move.Rock));
 
         Assert.Contains("afgebroken", output);
-        Assert.Contains("Stand na 1 rondes: gewonnen 1, verloren 0, gelijk 0.", output);
+        Assert.Contains("Stand na 1 ronde: gewonnen 1, verloren 0, gelijk 0.", output);
     }
 
     [Fact]
@@ -99,6 +99,7 @@ public sealed class ConsoleGameTests
     }
 
     // The fake random scripts the computer's moves, so the game is fully predictable.
+    // Without moves, any round played makes the fake throw.
     private static string Run(string input, FakeRandom? random = null)
     {
         using var reader = new StringReader(input);

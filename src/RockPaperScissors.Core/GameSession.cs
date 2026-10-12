@@ -6,6 +6,8 @@ namespace RockPaperScissors.Core;
 /// </summary>
 public sealed class GameSession
 {
+    public const int MinRounds = 1;
+
     /// <summary>Upper limit for a game, so an absurd number from the player is rejected.</summary>
     public const int MaxRounds = 1000;
 
@@ -17,14 +19,25 @@ public sealed class GameSession
     /// <param name="random">Injected, so tests can control the computer's moves.</param>
     public GameSession(int totalRounds, Random random)
     {
-        ArgumentOutOfRangeException.ThrowIfLessThan(totalRounds, 1);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(totalRounds, MaxRounds);
+        if (!IsValidTotalRounds(totalRounds))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(totalRounds), totalRounds, $"Must be between {MinRounds} and {MaxRounds}.");
+        }
+
         ArgumentNullException.ThrowIfNull(random);
 
         TotalRounds = totalRounds;
         _random = random;
         History = _history.AsReadOnly();
     }
+
+    /// <summary>
+    /// Lets the console reject bad input by asking again, while the constructor still
+    /// guards the same range against programming errors.
+    /// </summary>
+    public static bool IsValidTotalRounds(int totalRounds) =>
+        totalRounds is >= MinRounds and <= MaxRounds;
 
     public int TotalRounds { get; }
 
@@ -37,6 +50,14 @@ public sealed class GameSession
     public int Losses => Count(Outcome.Lose);
 
     public int Draws => Count(Outcome.Draw);
+
+    /// <summary>The game's outcome for the player, based on the rounds played so far.</summary>
+    public Outcome Result => Wins.CompareTo(Losses) switch
+    {
+        > 0 => Outcome.Win,
+        < 0 => Outcome.Lose,
+        _ => Outcome.Draw,
+    };
 
     public Round PlayRound(Move playerMove)
     {

@@ -1,6 +1,6 @@
 using RockPaperScissors.Core;
 
-namespace RockPaperScissors.Console;
+namespace RockPaperScissors.ConsoleUI;
 
 /// <summary>
 /// Translates moves to and from Dutch text. The one place in the console that names moves:

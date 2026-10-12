@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
@@ -11,7 +11,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RockPaperScissors.Tests", "tests\RockPaperScissors.Tests\RockPaperScissors.Tests.csproj", "{201295B9-8DA6-4939-B99E-6688B3914DF7}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RockPaperScissors.Console", "src\RockPaperScissors.Console\RockPaperScissors.Console.csproj", "{47284C3E-AB31-4781-9A96-475C45340B96}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RockPaperScissors.ConsoleUI", "src\RockPaperScissors.ConsoleUI\RockPaperScissors.ConsoleUI.csproj", "{47284C3E-AB31-4781-9A96-475C45340B96}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
