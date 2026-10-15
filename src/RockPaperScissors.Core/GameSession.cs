@@ -6,6 +6,7 @@ namespace RockPaperScissors.Core;
 /// </summary>
 public sealed class GameSession
 {
+    /// <summary>A game needs at least one round to have a winner.</summary>
     public const int MinRounds = 1;
 
     /// <summary>Upper limit for a game, so an absurd number from the player is rejected.</summary>
@@ -51,13 +52,26 @@ public sealed class GameSession
 
     public int Draws => Count(Outcome.Draw);
 
-    /// <summary>The game's outcome for the player, based on the rounds played so far.</summary>
-    public Outcome Result => Wins.CompareTo(Losses) switch
+    /// <summary>The game's outcome for the player. Only defined once all rounds are played.</summary>
+    /// <remarks>Throws while the game runs, so a half-played game is never reported as won or lost.</remarks>
+    public Outcome Result
     {
-        > 0 => Outcome.Win,
-        < 0 => Outcome.Lose,
-        _ => Outcome.Draw,
-    };
+        get
+        {
+            if (!IsFinished)
+            {
+                throw new InvalidOperationException(
+                    $"The game has no result before all {TotalRounds} rounds are played.");
+            }
+
+            return Wins.CompareTo(Losses) switch
+            {
+                > 0 => Outcome.Win,
+                < 0 => Outcome.Lose,
+                _ => Outcome.Draw,
+            };
+        }
+    }
 
     public Round PlayRound(Move playerMove)
     {

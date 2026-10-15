@@ -55,7 +55,7 @@ public sealed class GameSession
     public int Wins { get; }     // geteld uit History
     public int Losses { get; }
     public int Draws { get; }
-    public Outcome Result { get; }   // winnaar van het spel vanuit de speler, uit Wins en Losses
+    public Outcome Result { get; }   // winnaar van het spel vanuit de speler, uit Wins en Losses; exceptie als !IsFinished
 
     public Round PlayRound(Move playerMove);   // exceptie als IsFinished
 }
@@ -76,6 +76,7 @@ public sealed class GameSession
 - Gelijkspel telt als ronde en wordt apart in de score getoond.
 - Einde invoer (`null` van `ReadLine`): netjes afsluiten, met de stand tot dan toe als het spel al bezig was.
 - `PlayRound` na de laatste ronde: `InvalidOperationException`.
+- `Result` voordat alle rondes gespeeld zijn: `InvalidOperationException`. Een half gespeeld spel heeft geen winnaar; bij afgebroken invoer toont de console alleen de stand.
 
 ## Projectstructuur
 
@@ -92,7 +93,7 @@ tests/
 
 - `Rules`: alle 9 combinaties.
 - `Round`: uitkomst volgt `Rules`.
-- `GameSession`: klaar na precies n rondes, score en `Result` kloppen, weigert een ronde na afloop, weigert een ongeldig aantal rondes.
+- `GameSession`: klaar na precies n rondes, score en `Result` kloppen, `Result` geeft een exceptie vóór het einde, weigert een ronde na afloop, weigert een ongeldig aantal rondes.
 - `ConsoleGame`: spelverloop, ongeldige invoer, einde invoer, eindstand.
 - `MoveText`: geldige en ongeldige invoer.
 

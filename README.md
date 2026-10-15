@@ -29,7 +29,7 @@ tests/
 - `Move` en `Outcome`: enums voor de zetten en de uitkomst (gezien vanuit de speler).
 - `Rules.Resolve(player, computer)`: de enige plek die weet wie wint, op basis van een tabel "wint van".
 - `Round`: record met de twee zetten. `Outcome` wordt via `Rules` berekend en niet opgeslagen.
-- `GameSession`: één spel van n rondes. `PlayRound(move)` laat de computer een willekeurige zet kiezen, voegt de ronde toe en geeft hem terug. `Wins`, `Losses` en `Draws` worden geteld uit de gespeelde rondes, `Result` bepaalt daaruit de winnaar van het spel; `IsFinished` wordt waar na n rondes.
+- `GameSession`: één spel van n rondes. `PlayRound(move)` laat de computer een willekeurige zet kiezen, voegt de ronde toe en geeft hem terug. `Wins`, `Losses` en `Draws` worden geteld uit de gespeelde rondes, `Result` bepaalt daaruit de winnaar van het spel (pas als het spel klaar is, daarvoor geeft het een exceptie); `IsFinished` wordt waar na n rondes.
 
 **Console**
 - `ConsoleGame`: vraagt het aantal rondes, speelt rondes tot `IsFinished` en toont per ronde de uitkomst en aan het eind de score. Werkt op een `TextReader`/`TextWriter` in plaats van op `Console` zelf.
@@ -52,6 +52,6 @@ xUnit, deterministisch, naamgeving `Method_Situation_ExpectedResult`.
 
 - **Rules:** alle 9 combinaties, inclusief gelijkspel.
 - **Round:** uitkomst komt overeen met `Rules`.
-- **GameSession:** klaar na precies n rondes, score klopt, ronde na afloop geeft een exceptie, ongeldig aantal rondes wordt geweigerd, de computer speelt alle zetten (geseede `Random`).
+- **GameSession:** klaar na precies n rondes, score en winnaar kloppen, winnaar opvragen vóór het einde en een ronde na afloop geven een exceptie, ongeldig aantal rondes wordt geweigerd, de computer speelt alle zetten (geseede `Random`).
 - **ConsoleGame:** het hele spelverloop via `StringReader`/`StringWriter`: uitkomst per ronde, eindstand en winnaar, ongeldig aantal rondes, ongeldige zetten en einde van de invoer.
 - **MoveText:** geldige en ongeldige invoer.

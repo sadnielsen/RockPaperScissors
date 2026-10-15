@@ -75,9 +75,20 @@ public sealed class GameSessionTests
     }
 
     [Fact]
-    public void Result_NoRoundsPlayed_IsDraw()
+    public void Result_NoRoundsPlayed_Throws()
     {
-        Assert.Equal(Outcome.Draw, new GameSession(1, new FakeRandom()).Result);
+        var session = new GameSession(1, new FakeRandom());
+
+        Assert.Throws<InvalidOperationException>(() => session.Result);
+    }
+
+    [Fact]
+    public void Result_GameNotFinished_Throws()
+    {
+        var session = new GameSession(2, new FakeRandom(Move.Scissors));
+        session.PlayRound(Move.Rock);
+
+        Assert.Throws<InvalidOperationException>(() => session.Result);
     }
 
     [Fact]
