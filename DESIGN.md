@@ -71,7 +71,7 @@ public sealed class GameSession
 
 ## Randgevallen
 
-- Ongeldige zet: opnieuw vragen. Geaccepteerd: `r/p/s` en `rots/papier/schaar`, hoofdletterongevoelig, spaties eromheen genegeerd.
+- Ongeldige zet: opnieuw vragen. Geaccepteerd: `r/p/s` en `rots/papier/schaar` (plus `steen` als synoniem voor rots), hoofdletterongevoelig, spaties eromheen genegeerd.
 - Ongeldig aantal rondes (leeg, geen geheel getal, 0, negatief, meer dan 1000): opnieuw vragen.
 - Gelijkspel telt als ronde en wordt apart in de score getoond.
 - Einde invoer (`null` van `ReadLine`): netjes afsluiten, met de stand tot dan toe als het spel al bezig was.

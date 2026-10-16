@@ -8,18 +8,19 @@ namespace RockPaperScissors.ConsoleUI;
 /// </summary>
 public static class MoveText
 {
-    private sealed record Names(string Full, string Short);
+    // Synonyms are accepted as input only; Full stays the name shown to the player.
+    private sealed record Names(string Full, string Short, params string[] Synonyms);
 
     private static readonly IReadOnlyDictionary<Move, Names> NamesByMove = new Dictionary<Move, Names>
     {
-        [Move.Rock] = new("rots", "r"),
+        [Move.Rock] = new("rots", "r", "steen"),
         [Move.Paper] = new("papier", "p"),
         [Move.Scissors] = new("schaar", "s"),
     };
 
     public static string NameOf(Move move) => NamesByMove[move].Full;
 
-    /// <summary>Accepts the full or short name, ignoring case and surrounding spaces.</summary>
+    /// <summary>Accepts the full name, short name or a synonym, ignoring case and surrounding spaces.</summary>
     public static Move? Parse(string? input)
     {
         string text = input?.Trim() ?? string.Empty;
@@ -27,7 +28,8 @@ public static class MoveText
         foreach ((Move move, Names names) in NamesByMove)
         {
             if (text.Equals(names.Full, StringComparison.OrdinalIgnoreCase)
-                || text.Equals(names.Short, StringComparison.OrdinalIgnoreCase))
+                || text.Equals(names.Short, StringComparison.OrdinalIgnoreCase)
+                || names.Synonyms.Contains(text, StringComparer.OrdinalIgnoreCase))
             {
                 return move;
             }

@@ -8,6 +8,8 @@ public sealed class MoveTextTests
     [Theory]
     [InlineData("r", Move.Rock)]
     [InlineData("rots", Move.Rock)]
+    [InlineData("steen", Move.Rock)]
+    [InlineData("  STEEN ", Move.Rock)]
     [InlineData("p", Move.Paper)]
     [InlineData("papier", Move.Paper)]
     [InlineData("s", Move.Scissors)]
