@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Rots-Papier-Schaar in C# voor een UWV-sollicitatieopdracht. Het doel is een kleine, goed gestructureerde en goed testbare oplossing die de auteur volledig kan toelichten. Niet zoveel mogelijk architectuurconcepten.
+Rots-Papier-Schaar in C# voor een sollicitatieopdracht. Het doel is een kleine, goed gestructureerde en goed testbare oplossing die de auteur volledig kan toelichten. Niet zoveel mogelijk architectuurconcepten.
 
 ## Specificatie
 
