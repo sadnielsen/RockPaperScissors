@@ -1,0 +1,28 @@
+name: Claude op aanvraag
+on:
+  issue_comment:                  # comment op een PR of issue
+    types: [created]
+  pull_request_review_comment:    # comment bij een regel in "Files changed"
+    types: [created]
+
+jobs:
+  claude:
+    # Only start when the comment mentions @claude, so other comments don't use runs
+    if: contains(github.event.comment.body, '@claude')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # change code and push commits
+      pull-requests: write   # reply on pull requests
+      issues: write          # reply on issues
+      id-token: write
+      actions: read          # read CI results
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          trigger_phrase: "@claude"
+          claude_args: "--max-turns 10"
