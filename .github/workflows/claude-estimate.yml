@@ -28,7 +28,7 @@ jobs:
 
             Estimate this issue in story points.
 
-            1. Read .github/ESTIMATION.md. Use only its scale and criteria.
+            1. Read .github/estimes.md. Use only its scale and criteria.
             2. Read the issue with `gh issue view`.
             3. Look at the code that the issue would touch, so the estimate is
                based on the actual codebase, not just the issue text.
