@@ -1,0 +1,48 @@
+name: AI estimate
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  estimate:
+    # Only issues from people with access to the repo, so strangers can't use runs
+    if: contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read     # read code and ESTIMATION.md
+      issues: write      # add label and comment
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # GITHUB_TOKEN: labels it adds do not start other workflows
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            ISSUE: ${{ github.event.issue.number }}
+
+            Estimate this issue in story points.
+
+            1. Read .github/ESTIMATION.md. Use only its scale and criteria.
+            2. Read the issue with `gh issue view`.
+            3. Look at the code that the issue would touch, so the estimate is
+               based on the actual codebase, not just the issue text.
+            4. Choose exactly one value: 1, 2, 3, 5, 8, 13 or ?.
+            5. Add the label with
+               `gh issue edit <ISSUE> --repo <REPO> --add-label "ai:<value>"`.
+            6. Post one comment in English with `gh issue comment`, containing:
+               - the estimate,
+               - which files or classes are likely affected,
+               - the main uncertainty or risk,
+               - for 13 or ?: how to split the issue.
+               Keep it under 10 lines.
+
+            Do not change any files, labels other than ai:*, or other issues.
+          claude_args: |
+            --max-turns 15
+            --allowedTools "Read,Glob,Grep,Bash(gh issue view:*),Bash(gh issue edit:*),Bash(gh issue comment:*)"
